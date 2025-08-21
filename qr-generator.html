@@ -38,8 +38,8 @@ canvas{border:1px solid #ddd;background:white;max-width:100%}
     <div class="control-group">
         <label>每片最大字节数：</label>
         <select id="maxBytes">
-            <option value="300">300字节 (最易扫描)</option>
-            <option value="500" selected>500字节 (推荐)</option>
+            <option value="300" selected>300字节 (最易扫描)</option>
+            <option value="500">500字节 (均衡模式)</option>
             <option value="700">700字节 (中等密度)</option>
             <option value="1000">1000字节 (高密度)</option>
         </select>
@@ -49,8 +49,8 @@ canvas{border:1px solid #ddd;background:white;max-width:100%}
     <div class="control-group">
         <label>纠错级别：</label>
         <select id="errorLevel">
-            <option value="L">L - 低 (7%纠错，密度最低)</option>
-            <option value="M" selected>M - 中 (15%纠错)</option>
+            <option value="L" selected>L - 低 (7%纠错，密度最低，最易扫描)</option>
+            <option value="M">M - 中 (15%纠错，均衡)</option>
             <option value="Q">Q - 较高 (25%纠错)</option>
             <option value="H">H - 高 (30%纠错，密度最高)</option>
         </select>
@@ -58,6 +58,13 @@ canvas{border:1px solid #ddd;background:white;max-width:100%}
     </div>
     
     <button onclick="_f1()">生成二维码</button>
+    
+    <div style="margin-top: 15px;">
+        <label>快速预设：</label>
+        <button onclick="setPreset('easy')" style="background: #2196F3; margin-right: 5px;">📱 易扫描</button>
+        <button onclick="setPreset('balanced')" style="background: #FF9800; margin-right: 5px;">⚖️ 均衡</button>
+        <button onclick="setPreset('compact')" style="background: #9C27B0;">📦 紧凑</button>
+    </div>
 </div>
 
 <div class="info">
@@ -180,6 +187,33 @@ function _f1() {
             container.appendChild(errorMsg);
         }
     });
+}
+
+// 预设配置
+function setPreset(type) {
+    const maxBytesSelect = document.getElementById('maxBytes');
+    const errorLevelSelect = document.getElementById('errorLevel');
+    
+    switch(type) {
+        case 'easy':
+            // 最易扫描：小尺寸，低纠错
+            maxBytesSelect.value = '300';
+            errorLevelSelect.value = 'L';
+            break;
+        case 'balanced':
+            // 均衡模式：中等尺寸，中等纠错
+            maxBytesSelect.value = '500';
+            errorLevelSelect.value = 'M';
+            break;
+        case 'compact':
+            // 紧凑模式：大尺寸，高纠错
+            maxBytesSelect.value = '1000';
+            errorLevelSelect.value = 'H';
+            break;
+    }
+    
+    // 自动重新生成二维码
+    _f1();
 }
 
 // 页面加载时自动生成
