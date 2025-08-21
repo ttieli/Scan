@@ -88,16 +88,42 @@ function _g1(s) {
     return new Blob([s]).size;
 }
 
-function _s2(t, maxBytes) {
+// Base64编码函数（确保UTF-8兼容性）
+function toBase64(str) {
+    // 使用TextEncoder确保正确的UTF-8编码
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    let binary = '';
+    for (let i = 0; i < data.length; i++) {
+        binary += String.fromCharCode(data[i]);
+    }
+    return btoa(binary);
+}
+
+// Base64解码函数
+function fromBase64(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const decoder = new TextDecoder();
+    return decoder.decode(bytes);
+}
+
+function _s2(t, maxBytes, useBase64 = true) {
+    // 如果启用Base64编码（更好的兼容性）
+    const content = useBase64 ? toBase64(t) : t;
+    
     // 计算总字节数和预估片数
-    const totalBytes = _g1(t);
-    const headerSize = 40; // 增加预留空间以确保标记不会导致超长
-    const safetyMargin = 0.9; // 安全系数，留出10%的余量
+    const totalBytes = _g1(content);
+    const headerSize = 50; // 增加预留空间，包含base64标记
+    const safetyMargin = 0.85; // 更保守的安全系数
     const effectiveMax = Math.floor((maxBytes - headerSize) * safetyMargin);
     
     // 如果单片就能放下，直接返回
     if (totalBytes <= effectiveMax) {
-        return [t];
+        return [content];
     }
     
     // 预估片数
@@ -111,12 +137,10 @@ function _s2(t, maxBytes) {
     let currentFragment = '';
     let currentSize = 0;
     
-    // 按字符切分，确保不会破坏多字节字符
-    const chars = Array.from(t); // 正确处理Unicode字符
-    
-    for (let i = 0; i < chars.length; i++) {
-        const char = chars[i];
-        const charSize = _g1(char);
+    // Base64字符串可以直接按字符切分（都是ASCII）
+    for (let i = 0; i < content.length; i++) {
+        const char = content[i];
+        const charSize = 1; // Base64每个字符都是1字节
         
         // 如果当前片接近目标大小，或超过最大限制，则开始新片
         if (currentSize > 0 && (currentSize + charSize > targetSize || currentSize + charSize > effectiveMax)) {
@@ -135,13 +159,12 @@ function _s2(t, maxBytes) {
     
     const totalFragments = fragments.length;
     const timestamp = Date.now().toString(36).slice(-4); // 短时间戳用于标识同一批次
+    const encoding = useBase64 ? 'B' : 'T'; // B=Base64, T=Text
     
-    // 使用增强的标记格式：[当前片/总片数:批次ID] 内容
+    // 使用增强的标记格式：[当前片/总片数:批次ID:编码] 内容
     return fragments.map((fragment, index) => {
         const current = index + 1;
-        // 对于第一片，添加一个空格前缀以改善扫描识别率
-        const prefix = current === 1 ? ' ' : '';
-        const markedFragment = `${prefix}[${current}/${totalFragments}:${timestamp}] ${fragment}`;
+        const markedFragment = `[${current}/${totalFragments}:${timestamp}:${encoding}]${fragment}`;
         
         // 验证最终大小不超过限制
         const finalSize = _g1(markedFragment);

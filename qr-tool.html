@@ -958,28 +958,49 @@ class QRDecoder {
     }
     
     handleResult(text, fileItem) {
-        // 检查是否是分片格式 [x/y] content 或增强格式 [x/y:batch]
-        // 支持可选的前导空格（用于改善第一片的扫描）
+        // 检查是否是分片格式，支持多种格式
+        const base64Match = text.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+):([BT])\]([\s\S]*)/);
         const enhancedMatch = text.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
         const fragmentMatch = text.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (enhancedMatch || fragmentMatch) {
-            const match = enhancedMatch || fragmentMatch;
+        if (base64Match || enhancedMatch || fragmentMatch) {
+            const match = base64Match || enhancedMatch || fragmentMatch;
             const index = parseInt(match[1]);
             const total = parseInt(match[2]);
-            const content = enhancedMatch ? enhancedMatch[4] : fragmentMatch[3];
+            let content, batchId, encoding;
+            
+            if (base64Match) {
+                batchId = base64Match[3];
+                encoding = base64Match[4];
+                content = base64Match[5];
+            } else if (enhancedMatch) {
+                batchId = enhancedMatch[3];
+                encoding = 'T';
+                content = enhancedMatch[4];
+            } else {
+                batchId = 'default';
+                encoding = 'T';
+                content = fragmentMatch[3];
+            }
             
             // 存储分片
-            const key = `fragments_${total}`;
+            const key = `fragments_${batchId}_${total}`;
             if (!this.fragments.has(key)) {
                 this.fragments.set(key, {
                     total: total,
-                    pieces: new Map()
+                    pieces: new Map(),
+                    encoding: encoding,
+                    batchId: batchId
                 });
             }
             
             const group = this.fragments.get(key);
             group.pieces.set(index, content);
+            
+            // 更新编码类型
+            if (encoding === 'B') {
+                group.encoding = encoding;
+            }
             
             this.updateFileStatus(fileItem, 'fragment', `分片 ${index}/${total}`);
         } else {
@@ -1006,6 +1027,21 @@ class QRDecoder {
                     }
                 }
                 mergedContent = sortedTexts.join('');
+                
+                // 如果是Base64编码，解码
+                if (group.encoding === 'B') {
+                    try {
+                        const binary = atob(mergedContent);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        const decoder = new TextDecoder();
+                        mergedContent = decoder.decode(bytes);
+                    } catch (e) {
+                        console.error('Base64解码失败:', e);
+                    }
+                }
                 
                 // 显示分片进度
                 this.showFragmentProgress(group);
@@ -1378,12 +1414,22 @@ class QRCameraScanner {
         // 播放提示音
         this.successSound();
         
-        // 检查是否是增强分片格式 [x/y:batch] 或旧格式 [x/y]
+        // 检查是否是增强分片格式 [x/y:batch:encoding] 或 [x/y:batch] 或旧格式 [x/y]
         // 支持可选的前导空格（用于改善第一片的扫描）
+        const base64Match = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+):([BT])\]([\s\S]*)/); // 新格式带编码
         const enhancedMatch = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
         const legacyMatch = content.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (enhancedMatch) {
+        if (base64Match) {
+            // 新格式，包含编码标记
+            const index = parseInt(base64Match[1]);
+            const total = parseInt(base64Match[2]);
+            const batchId = base64Match[3];
+            const encoding = base64Match[4];
+            const text = base64Match[5];
+            
+            this.handleFragment(index, total, text, batchId, encoding);
+        } else if (enhancedMatch) {
             const index = parseInt(enhancedMatch[1]);
             const total = parseInt(enhancedMatch[2]);
             const batchId = enhancedMatch[3];
@@ -1416,7 +1462,7 @@ class QRCameraScanner {
         }
     }
     
-    handleFragment(index, total, text, batchId = 'default') {
+    handleFragment(index, total, text, batchId = 'default', encoding = 'T') {
         // 使用batchId和total作为key来分组同一批次的片段
         const key = `camera_${batchId}_${total}`;
         
@@ -1425,6 +1471,7 @@ class QRCameraScanner {
                 total: total,
                 pieces: new Map(),
                 batchId: batchId,
+                encoding: encoding,
                 startTime: Date.now()
             });
         }
@@ -1433,6 +1480,11 @@ class QRCameraScanner {
         const isNewFragment = !group.pieces.has(index);
         group.pieces.set(index, text);
         group.lastScanned = index; // 记录最后扫描的片段
+        
+        // 如果编码不一致，更新为最新的
+        if (group.encoding !== encoding && encoding !== 'T') {
+            group.encoding = encoding;
+        }
         
         // 显示扫描成功通知
         if (isNewFragment) {
@@ -1465,7 +1517,23 @@ class QRCameraScanner {
                 }
             }
             
-            const fullText = sortedTexts.join('');
+            let fullText = sortedTexts.join('');
+            
+            // 如果是Base64编码，解码
+            if (group.encoding === 'B') {
+                try {
+                    // Base64解码
+                    const binary = atob(fullText);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const decoder = new TextDecoder();
+                    fullText = decoder.decode(bytes);
+                } catch (e) {
+                    console.error('Base64解码失败:', e);
+                }
+            }
             this.decoder.showResult(fullText);
             this.cameraStatus.textContent = `✅ 完成！全部 ${total} 片已合并`;
             
