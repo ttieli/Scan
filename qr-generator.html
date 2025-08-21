@@ -125,7 +125,9 @@ function _s2(t, maxBytes) {
     // 使用增强的标记格式：[当前片/总片数:批次ID] 内容
     return fragments.map((fragment, index) => {
         const current = index + 1;
-        return `[${current}/${totalFragments}:${timestamp}] ${fragment}`;
+        // 对于第一片，添加一个空格前缀以改善扫描识别率
+        const prefix = current === 1 ? ' ' : '';
+        return `${prefix}[${current}/${totalFragments}:${timestamp}] ${fragment}`;
     });
 }
 

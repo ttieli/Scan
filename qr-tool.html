@@ -190,10 +190,20 @@ body {
     animation: pulse 0.5s;
 }
 
+.camera-progress-item.just-scanned {
+    background: #4caf50;
+    animation: flash 0.5s 3;
+}
+
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.2); }
     100% { transform: scale(1); }
+}
+
+@keyframes flash {
+    0%, 100% { transform: scale(1); background: #4caf50; }
+    50% { transform: scale(1.3); background: #81c784; }
 }
 
 #start-camera-btn {
@@ -370,6 +380,55 @@ h1 {
 .fragment-item.completed {
     background: #2196f3;
     color: white;
+}
+
+.fragment-item.just-scanned {
+    background: #4caf50;
+    animation: flash 0.5s 3;
+}
+
+.scan-success-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #4caf50;
+    color: white;
+    padding: 20px 40px;
+    border-radius: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    z-index: 10000;
+    animation: slideIn 0.3s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.completion-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px 50px;
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 10000;
+    animation: bounceIn 0.5s;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.4);
+    text-align: center;
+}
+
+@keyframes slideIn {
+    from { transform: translate(-50%, -70%); opacity: 0; }
+    to { transform: translate(-50%, -50%); opacity: 1; }
+}
+
+@keyframes bounceIn {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 #preview {
@@ -899,13 +958,16 @@ class QRDecoder {
     }
     
     handleResult(text, fileItem) {
-        // 检查是否是分片格式 [x/y] content
-        const fragmentMatch = text.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        // 检查是否是分片格式 [x/y] content 或增强格式 [x/y:batch]
+        // 支持可选的前导空格（用于改善第一片的扫描）
+        const enhancedMatch = text.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
+        const fragmentMatch = text.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (fragmentMatch) {
-            const index = parseInt(fragmentMatch[1]);
-            const total = parseInt(fragmentMatch[2]);
-            const content = fragmentMatch[3];
+        if (enhancedMatch || fragmentMatch) {
+            const match = enhancedMatch || fragmentMatch;
+            const index = parseInt(match[1]);
+            const total = parseInt(match[2]);
+            const content = enhancedMatch ? enhancedMatch[4] : fragmentMatch[3];
             
             // 存储分片
             const key = `fragments_${total}`;
@@ -978,6 +1040,11 @@ class QRDecoder {
             
             if (group.pieces.has(i)) {
                 item.classList.add('completed');
+                // 如果是刚刚扫描的片段，添加特殊动画
+                if (group.lastScanned === i) {
+                    item.classList.add('just-scanned');
+                    setTimeout(() => item.classList.remove('just-scanned'), 1500);
+                }
             }
             
             this.fragmentProgress.appendChild(item);
@@ -1108,7 +1175,69 @@ class QRCameraScanner {
         this.scanCooldown = false;
         this.stream = null;
         
+        // 创建音频对象用于反馈
+        this.successSound = this.createBeepSound(800, 100); // 高音短促
+        this.completeSound = this.createBeepSound(400, 300); // 低音长音
+        
         this.initCamera();
+    }
+    
+    createBeepSound(frequency, duration) {
+        // 创建Web Audio API音频
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioContext = new AudioContext();
+            
+            return () => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration / 1000);
+            };
+        } catch (e) {
+            // 如果Web Audio API不可用，返回空函数
+            return () => {};
+        }
+    }
+    
+    showNotification(message, type = 'success') {
+        // 移除现有通知
+        const existing = document.querySelector('.scan-success-notification, .completion-notification');
+        if (existing) existing.remove();
+        
+        const notification = document.createElement('div');
+        notification.className = type === 'complete' ? 'completion-notification' : 'scan-success-notification';
+        notification.innerHTML = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, type === 'complete' ? 3000 : 1500);
+    }
+    
+    enhanceImageData(imageData) {
+        // 增强图像对比度以提高识别率
+        const data = new Uint8ClampedArray(imageData.data);
+        const factor = 1.5;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            // 增强对比度
+            data[i] = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));
+            data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * factor + 128));
+            data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * factor + 128));
+        }
+        
+        return new ImageData(data, imageData.width, imageData.height);
     }
     
     initCamera() {
@@ -1207,9 +1336,19 @@ class QRCameraScanner {
             this.ctx.drawImage(this.video, 0, 0);
             
             const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: 'dontInvert'
+            
+            // 尝试多种解码方式以提高识别率
+            let code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'attemptBoth' // 尝试正反两种颜色
             });
+            
+            // 如果失败，尝试增强对比度
+            if (!code) {
+                const enhancedData = this.enhanceImageData(imageData);
+                code = jsQR(enhancedData.data, enhancedData.width, enhancedData.height, {
+                    inversionAttempts: 'attemptBoth'
+                });
+            }
             
             if (code && !this.scanCooldown) {
                 this.handleQRCode(code.data);
@@ -1220,8 +1359,9 @@ class QRCameraScanner {
     }
     
     handleQRCode(content) {
-        // 避免重复扫描同一个码
-        if (content === this.lastScannedContent) return;
+        // 避免重复扫描同一个码，但允许重新扫描第一片（因为可能难以识别）
+        const isFirstFragment = content.match(/^\[1\//);
+        if (content === this.lastScannedContent && !isFirstFragment) return;
         
         this.lastScannedContent = content;
         this.scanCooldown = true;
@@ -1232,12 +1372,16 @@ class QRCameraScanner {
         
         // 震动反馈（如果支持）
         if (navigator.vibrate) {
-            navigator.vibrate(100);
+            navigator.vibrate(200);
         }
         
+        // 播放提示音
+        this.successSound();
+        
         // 检查是否是增强分片格式 [x/y:batch] 或旧格式 [x/y]
-        const enhancedMatch = content.match(/^\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
-        const legacyMatch = content.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        // 支持可选的前导空格（用于改善第一片的扫描）
+        const enhancedMatch = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
+        const legacyMatch = content.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
         if (enhancedMatch) {
             const index = parseInt(enhancedMatch[1]);
@@ -1286,7 +1430,19 @@ class QRCameraScanner {
         }
         
         const group = this.cameraFragments.get(key);
+        const isNewFragment = !group.pieces.has(index);
         group.pieces.set(index, text);
+        group.lastScanned = index; // 记录最后扫描的片段
+        
+        // 显示扫描成功通知
+        if (isNewFragment) {
+            // 第一片特别提示
+            if (index === 1) {
+                this.showNotification(`🎆 首片扫描成功！第 ${index} 片`, 'success');
+            } else {
+                this.showNotification(`✅ 成功扫描第 ${index} 片`, 'success');
+            }
+        }
         
         // 计算缺失的片段
         const missingPieces = [];
@@ -1313,6 +1469,20 @@ class QRCameraScanner {
             this.decoder.showResult(fullText);
             this.cameraStatus.textContent = `✅ 完成！全部 ${total} 片已合并`;
             
+            // 播放完成音效
+            this.completeSound();
+            
+            // 显示完成通知
+            this.showNotification(
+                `🎉 扫描完成！<br>成功合并全部 ${total} 片内容`,
+                'complete'
+            );
+            
+            // 额外震动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            }
+            
             // 清理
             this.cameraFragments.delete(key);
             setTimeout(() => {
@@ -1320,7 +1490,14 @@ class QRCameraScanner {
             }, 3000);
         } else {
             const remaining = total - group.pieces.size;
-            this.cameraStatus.textContent = `📊 进度：${group.pieces.size}/${total} | 还需扫描：${missingPieces.slice(0, 5).join(', ')}${missingPieces.length > 5 ? '...' : ''}`;
+            // 特别提示第一片如果未扫描
+            let statusText = `📊 进度：${group.pieces.size}/${total}`;
+            if (!group.pieces.has(1)) {
+                statusText += ' | 🔍 请先扫描第1片';
+            } else {
+                statusText += ` | 还需扫描：${missingPieces.slice(0, 5).join(', ')}${missingPieces.length > 5 ? '...' : ''}`;
+            }
+            this.cameraStatus.textContent = statusText;
         }
     }
     
@@ -1344,6 +1521,16 @@ class QRCameraScanner {
             
             if (group.pieces.has(i)) {
                 item.classList.add('completed');
+                // 如果是刚刚扫描的片段，添加特殊动画
+                if (group.lastScanned === i) {
+                    item.classList.add('just-scanned');
+                    setTimeout(() => item.classList.remove('just-scanned'), 1500);
+                }
+            } else if (i === 1 && !group.pieces.has(1)) {
+                // 特别标记第一片
+                item.style.border = '3px solid #f44336';
+                item.style.animation = 'pulse 0.8s infinite';
+                item.style.background = '#ffebee';
             } else if (missingPieces.indexOf(i) < 3) {
                 // 标记前3个需要扫描的片段
                 item.style.border = '2px solid #ff9800';
