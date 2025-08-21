@@ -1235,19 +1235,27 @@ class QRCameraScanner {
             navigator.vibrate(100);
         }
         
-        // 检查是否是分片格式 [x/y]
-        const fragmentMatch = content.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        // 检查是否是增强分片格式 [x/y:batch] 或旧格式 [x/y]
+        const enhancedMatch = content.match(/^\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
+        const legacyMatch = content.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (fragmentMatch) {
-            const index = parseInt(fragmentMatch[1]);
-            const total = parseInt(fragmentMatch[2]);
-            const text = fragmentMatch[3];
+        if (enhancedMatch) {
+            const index = parseInt(enhancedMatch[1]);
+            const total = parseInt(enhancedMatch[2]);
+            const batchId = enhancedMatch[3];
+            const text = enhancedMatch[4];
+            
+            this.handleFragment(index, total, text, batchId);
+        } else if (legacyMatch) {
+            const index = parseInt(legacyMatch[1]);
+            const total = parseInt(legacyMatch[2]);
+            const text = legacyMatch[3];
             
             this.handleFragment(index, total, text);
         } else {
             // 单个二维码，直接显示结果
             this.decoder.showResult(content);
-            this.cameraStatus.textContent = '扫描成功！继续扫描或清除结果重新开始';
+            this.cameraStatus.textContent = '✅ 扫描成功！（普通二维码）';
         }
     }
     
@@ -1264,22 +1272,32 @@ class QRCameraScanner {
         }
     }
     
-    handleFragment(index, total, text) {
-        // 使用total作为key来分组相同总数的片段
-        const key = `camera_group_${total}`;
+    handleFragment(index, total, text, batchId = 'default') {
+        // 使用batchId和total作为key来分组同一批次的片段
+        const key = `camera_${batchId}_${total}`;
         
         if (!this.cameraFragments.has(key)) {
             this.cameraFragments.set(key, {
                 total: total,
-                pieces: new Map()
+                pieces: new Map(),
+                batchId: batchId,
+                startTime: Date.now()
             });
         }
         
         const group = this.cameraFragments.get(key);
         group.pieces.set(index, text);
         
+        // 计算缺失的片段
+        const missingPieces = [];
+        for (let i = 1; i <= total; i++) {
+            if (!group.pieces.has(i)) {
+                missingPieces.push(i);
+            }
+        }
+        
         // 更新进度显示
-        this.updateCameraProgress(group);
+        this.updateCameraProgress(group, missingPieces);
         
         // 检查是否收集完整
         if (group.pieces.size === total) {
@@ -1293,7 +1311,7 @@ class QRCameraScanner {
             
             const fullText = sortedTexts.join('');
             this.decoder.showResult(fullText);
-            this.cameraStatus.textContent = `已完成！全部 ${total} 片已合并`;
+            this.cameraStatus.textContent = `✅ 完成！全部 ${total} 片已合并`;
             
             // 清理
             this.cameraFragments.delete(key);
@@ -1301,21 +1319,35 @@ class QRCameraScanner {
                 this.cameraProgress.style.display = 'none';
             }, 3000);
         } else {
-            this.cameraStatus.textContent = `已扫描 ${group.pieces.size}/${total} 片`;
+            const remaining = total - group.pieces.size;
+            this.cameraStatus.textContent = `📊 进度：${group.pieces.size}/${total} | 还需扫描：${missingPieces.slice(0, 5).join(', ')}${missingPieces.length > 5 ? '...' : ''}`;
         }
     }
     
-    updateCameraProgress(group) {
+    updateCameraProgress(group, missingPieces = []) {
         this.cameraProgress.style.display = 'block';
         this.cameraProgressItems.innerHTML = '';
+        
+        // 添加批次信息
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = 'width: 100%; margin-bottom: 10px; font-size: 12px; color: #666;';
+        infoDiv.textContent = group.batchId !== 'default' ? `批次: ${group.batchId}` : '';
+        if (infoDiv.textContent) {
+            this.cameraProgressItems.appendChild(infoDiv);
+        }
         
         for (let i = 1; i <= group.total; i++) {
             const item = document.createElement('div');
             item.className = 'camera-progress-item';
             item.textContent = i;
+            item.title = group.pieces.has(i) ? '已扫描' : '待扫描';
             
             if (group.pieces.has(i)) {
                 item.classList.add('completed');
+            } else if (missingPieces.indexOf(i) < 3) {
+                // 标记前3个需要扫描的片段
+                item.style.border = '2px solid #ff9800';
+                item.style.animation = 'pulse 1s infinite';
             }
             
             this.cameraProgressItems.appendChild(item);

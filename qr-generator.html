@@ -86,17 +86,26 @@ function _g1(s) {
 }
 
 function _s2(t, maxBytes) {
+    // 计算总字节数和预估片数
+    const totalBytes = _g1(t);
+    const headerSize = 35; // 预留给标记的空间，增加到35以容纳更多信息
+    const effectiveMax = maxBytes - headerSize;
+    const estimatedFragments = Math.ceil(totalBytes / effectiveMax);
+    
+    // 计算每片的理想大小，使各片密度均匀
+    const idealFragmentSize = Math.ceil(totalBytes / estimatedFragments);
+    const targetSize = Math.min(idealFragmentSize, effectiveMax);
+    
     const fragments = [];
     let currentFragment = '';
     let currentSize = 0;
-    const headerSize = 30; // 预留给 [x/y] 标记的空间
-    const effectiveMax = maxBytes - headerSize;
     
     for (let i = 0; i < t.length; i++) {
         const char = t[i];
         const charSize = _g1(char);
         
-        if (currentSize + charSize > effectiveMax) {
+        // 如果当前片接近目标大小，或超过最大限制，则开始新片
+        if (currentSize > 0 && (currentSize + charSize > targetSize || currentSize + charSize > effectiveMax)) {
             fragments.push(currentFragment);
             currentFragment = char;
             currentSize = charSize;
@@ -111,7 +120,13 @@ function _s2(t, maxBytes) {
     }
     
     const totalFragments = fragments.length;
-    return fragments.map((fragment, index) => `[${index + 1}/${totalFragments}] ${fragment}`);
+    const timestamp = Date.now().toString(36).slice(-4); // 短时间戳用于标识同一批次
+    
+    // 使用增强的标记格式：[当前片/总片数:批次ID] 内容
+    return fragments.map((fragment, index) => {
+        const current = index + 1;
+        return `[${current}/${totalFragments}:${timestamp}] ${fragment}`;
+    });
 }
 
 function _f1() {
@@ -135,11 +150,19 @@ function _f1() {
         • 片数：1 (单片，无需分割)`;
     } else {
         fragments = _s2(text, maxBytes);
+        // 计算每片的实际大小
+        const fragmentSizes = fragments.map(f => _g1(f));
+        const avgSize = Math.round(fragmentSizes.reduce((a, b) => a + b, 0) / fragments.length);
+        const minSize = Math.min(...fragmentSizes);
+        const maxSize = Math.max(...fragmentSizes);
+        
         statsDiv.innerHTML = `<strong>统计信息：</strong><br>
-        • 字符数：${text.length}<br>
-        • 字节数：${textSize}<br>
-        • 片数：${fragments.length}<br>
-        • 每片最大：${maxBytes}字节`;
+        • 总字符数：${text.length} 个<br>
+        • 总字节数：${textSize} 字节<br>
+        • 分片数量：${fragments.length} 片<br>
+        • 平均大小：${avgSize} 字节<br>
+        • 密度范围：${minSize}-${maxSize} 字节<br>
+        • 批次标识：${fragments[0].match(/\[(.*?)\]/)[1].split(':')[1]}`;
     }
     
     statsDiv.style.display = 'block';
