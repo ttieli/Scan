@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>二维码扫描器</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #000;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#scanner-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+}
+
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.scan-region {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    border: 2px solid #4CAF50;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.scan-region::before,
+.scan-region::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #4CAF50;
+}
+
+.scan-region::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.scan-region::after {
+    top: -2px;
+    right: -2px;
+    border-left: none;
+    border-bottom: none;
+}
+
+.scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #4CAF50, transparent);
+    animation: scan 2s infinite;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    50% { top: calc(100% - 2px); }
+    100% { top: 0; }
+}
+
+#status {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    text-align: center;
+    min-width: 200px;
+}
+
+#progress {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 15px 25px;
+    border-radius: 10px;
+    display: none;
+    max-width: 90%;
+}
+
+.progress-title {
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: #4CAF50;
+}
+
+.progress-items {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.progress-item {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #666;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.3s;
+}
+
+.progress-item.completed {
+    background: #4CAF50;
+    border-color: #4CAF50;
+    animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+#result {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #4CAF50;
+    padding: 12px 30px;
+    border-radius: 25px;
+    display: none;
+    font-size: 16px;
+    animation: slideUp 0.5s;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.error {
+    background: #f44336 !important;
+}
+
+.success {
+    background: #4CAF50 !important;
+}
+
+#start-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 18px;
+    border-radius: 30px;
+    cursor: pointer;
+    display: none;
+}
+
+#start-button:active {
+    transform: translate(-50%, -50%) scale(0.95);
+}
+</style>
+</head>
+<body>
+<div id="scanner-container">
+    <video id="video" playsinline></video>
+    <div id="overlay">
+        <div class="scan-region">
+            <div class="scan-line"></div>
+        </div>
+    </div>
+    <div id="status">初始化相机...</div>
+    <div id="progress">
+        <div class="progress-title">扫描进度</div>
+        <div class="progress-items" id="progress-items"></div>
+    </div>
+    <div id="result"></div>
+    <button id="start-button">开始扫描</button>
+</div>
+
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+class QRScanner {
+    constructor() {
+        this.video = document.getElementById('video');
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.scanning = false;
+        this.fragments = new Map();
+        this.lastScannedContent = null;
+        this.scanCooldown = false;
+        
+        this.init();
+    }
+    
+    async init() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            
+            this.video.srcObject = stream;
+            this.video.onloadedmetadata = () => {
+                this.video.play();
+                this.updateStatus('将二维码对准扫描框');
+                this.startScanning();
+            };
+        } catch (error) {
+            console.error('Camera error:', error);
+            this.updateStatus('无法访问相机', true);
+            
+            // 显示开始按钮让用户重试
+            const startBtn = document.getElementById('start-button');
+            startBtn.style.display = 'block';
+            startBtn.onclick = () => {
+                startBtn.style.display = 'none';
+                this.init();
+            };
+        }
+    }
+    
+    startScanning() {
+        this.scanning = true;
+        this.scan();
+    }
+    
+    scan() {
+        if (!this.scanning) return;
+        
+        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+            this.ctx.drawImage(this.video, 0, 0);
+            
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+            });
+            
+            if (code && !this.scanCooldown) {
+                this.handleQRCode(code.data);
+            }
+        }
+        
+        requestAnimationFrame(() => this.scan());
+    }
+    
+    handleQRCode(content) {
+        // 避免重复扫描同一个码
+        if (content === this.lastScannedContent) return;
+        
+        this.lastScannedContent = content;
+        this.scanCooldown = true;
+        setTimeout(() => {
+            this.scanCooldown = false;
+            this.lastScannedContent = null;
+        }, 1000);
+        
+        // 震动反馈（如果支持）
+        if (navigator.vibrate) {
+            navigator.vibrate(100);
+        }
+        
+        // 检查是否是分片格式 [x/y]
+        const fragmentMatch = content.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        
+        if (fragmentMatch) {
+            const index = parseInt(fragmentMatch[1]);
+            const total = parseInt(fragmentMatch[2]);
+            const text = fragmentMatch[3];
+            
+            this.handleFragment(index, total, text);
+        } else {
+            // 单个二维码，直接复制
+            this.copyToClipboard(content);
+            this.showResult('已复制到剪贴板');
+        }
+    }
+    
+    handleFragment(index, total, text) {
+        // 使用total作为key来分组相同总数的片段
+        const key = `group_${total}`;
+        
+        if (!this.fragments.has(key)) {
+            this.fragments.set(key, {
+                total: total,
+                pieces: new Map()
+            });
+        }
+        
+        const group = this.fragments.get(key);
+        group.pieces.set(index, text);
+        
+        // 更新进度显示
+        this.updateProgress(group);
+        
+        // 检查是否收集完整
+        if (group.pieces.size === total) {
+            // 按序号排序并合并
+            const sortedTexts = [];
+            for (let i = 1; i <= total; i++) {
+                if (group.pieces.has(i)) {
+                    sortedTexts.push(group.pieces.get(i));
+                }
+            }
+            
+            const fullText = sortedTexts.join('');
+            this.copyToClipboard(fullText);
+            this.showResult(`已完成！全部 ${total} 片已合并并复制到剪贴板`);
+            
+            // 清理
+            this.fragments.delete(key);
+            setTimeout(() => {
+                document.getElementById('progress').style.display = 'none';
+            }, 3000);
+        } else {
+            this.updateStatus(`已扫描 ${group.pieces.size}/${total} 片`);
+        }
+    }
+    
+    updateProgress(group) {
+        const progressDiv = document.getElementById('progress');
+        const itemsDiv = document.getElementById('progress-items');
+        
+        progressDiv.style.display = 'block';
+        itemsDiv.innerHTML = '';
+        
+        for (let i = 1; i <= group.total; i++) {
+            const item = document.createElement('div');
+            item.className = 'progress-item';
+            item.textContent = i;
+            
+            if (group.pieces.has(i)) {
+                item.classList.add('completed');
+            }
+            
+            itemsDiv.appendChild(item);
+        }
+    }
+    
+    async copyToClipboard(text) {
+        try {
+            // 优先使用 Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // 降级方案
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+        } catch (error) {
+            console.error('Copy failed:', error);
+            this.showResult('复制失败，请手动复制', true);
+        }
+    }
+    
+    updateStatus(message, isError = false) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = isError ? 'error' : '';
+    }
+    
+    showResult(message, isError = false) {
+        const result = document.getElementById('result');
+        result.textContent = message;
+        result.className = isError ? 'error' : 'success';
+        result.style.display = 'block';
+        
+        setTimeout(() => {
+            result.style.display = 'none';
+        }, 3000);
+    }
+}
+
+// 启动扫描器
+new QRScanner();
+</script>
+</body>
+</html>
