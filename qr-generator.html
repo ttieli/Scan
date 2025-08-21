@@ -38,10 +38,13 @@ canvas{border:1px solid #ddd;background:white;max-width:100%}
     <div class="control-group">
         <label>每片最大字节数：</label>
         <select id="maxBytes">
+            <option value="200">200字节 (超易扫描)</option>
             <option value="300" selected>300字节 (最易扫描)</option>
+            <option value="400">400字节 (推荐)</option>
             <option value="500">500字节 (均衡模式)</option>
-            <option value="700">700字节 (中等密度)</option>
-            <option value="1000">1000字节 (高密度)</option>
+            <option value="600">600字节 (中等密度)</option>
+            <option value="700">700字节 (较高密度)</option>
+            <option value="800">800字节 (高密度)</option>
         </select>
         <div class="size-hint">字节数越小，二维码越容易被扫描</div>
     </div>
@@ -88,20 +91,31 @@ function _g1(s) {
 function _s2(t, maxBytes) {
     // 计算总字节数和预估片数
     const totalBytes = _g1(t);
-    const headerSize = 35; // 预留给标记的空间，增加到35以容纳更多信息
-    const effectiveMax = maxBytes - headerSize;
+    const headerSize = 40; // 增加预留空间以确保标记不会导致超长
+    const safetyMargin = 0.9; // 安全系数，留出10%的余量
+    const effectiveMax = Math.floor((maxBytes - headerSize) * safetyMargin);
+    
+    // 如果单片就能放下，直接返回
+    if (totalBytes <= effectiveMax) {
+        return [t];
+    }
+    
+    // 预估片数
     const estimatedFragments = Math.ceil(totalBytes / effectiveMax);
     
     // 计算每片的理想大小，使各片密度均匀
-    const idealFragmentSize = Math.ceil(totalBytes / estimatedFragments);
+    const idealFragmentSize = Math.floor(totalBytes / estimatedFragments);
     const targetSize = Math.min(idealFragmentSize, effectiveMax);
     
     const fragments = [];
     let currentFragment = '';
     let currentSize = 0;
     
-    for (let i = 0; i < t.length; i++) {
-        const char = t[i];
+    // 按字符切分，确保不会破坏多字节字符
+    const chars = Array.from(t); // 正确处理Unicode字符
+    
+    for (let i = 0; i < chars.length; i++) {
+        const char = chars[i];
         const charSize = _g1(char);
         
         // 如果当前片接近目标大小，或超过最大限制，则开始新片
@@ -127,7 +141,15 @@ function _s2(t, maxBytes) {
         const current = index + 1;
         // 对于第一片，添加一个空格前缀以改善扫描识别率
         const prefix = current === 1 ? ' ' : '';
-        return `${prefix}[${current}/${totalFragments}:${timestamp}] ${fragment}`;
+        const markedFragment = `${prefix}[${current}/${totalFragments}:${timestamp}] ${fragment}`;
+        
+        // 验证最终大小不超过限制
+        const finalSize = _g1(markedFragment);
+        if (finalSize > maxBytes) {
+            console.warn(`Fragment ${current} size (${finalSize}) exceeds limit (${maxBytes})`);
+        }
+        
+        return markedFragment;
     });
 }
 
@@ -196,6 +218,11 @@ function _f1() {
         try {
             // 根据选择的纠错级别生成二维码
             const correctLevel = _a1.CorrectLevel[errorLevel];
+            
+            // 测试内容长度
+            const fragmentSize = _g1(fragment);
+            console.log(`Fragment ${index + 1}: ${fragmentSize} bytes`);
+            
             new _a1('_x' + index, {
                 text: fragment,
                 width: 300,
@@ -205,11 +232,18 @@ function _f1() {
                 correctLevel: correctLevel
             });
         } catch (e) {
-            console.error(e);
+            console.error(`Fragment ${index + 1} error:`, e);
             const errorMsg = document.createElement('div');
             errorMsg.style.color = 'red';
-            errorMsg.textContent = '生成失败：内容可能过长';
+            errorMsg.style.fontSize = '12px';
+            errorMsg.innerHTML = `生成失败：内容过长<br>片段大小：${_g1(fragment)} 字节<br>请减小"每片最大字节数"设置`;
             container.appendChild(errorMsg);
+            
+            // 显示片段内容预览以便调试
+            const debugInfo = document.createElement('div');
+            debugInfo.style.cssText = 'font-size: 10px; color: #666; margin-top: 5px; word-break: break-all;';
+            debugInfo.textContent = `内容预览: ${fragment.substring(0, 50)}...`;
+            container.appendChild(debugInfo);
         }
     });
 }
@@ -227,13 +261,13 @@ function setPreset(type) {
             break;
         case 'balanced':
             // 均衡模式：中等尺寸，中等纠错
-            maxBytesSelect.value = '500';
+            maxBytesSelect.value = '400';
             errorLevelSelect.value = 'M';
             break;
         case 'compact':
             // 紧凑模式：大尺寸，高纠错
-            maxBytesSelect.value = '1000';
-            errorLevelSelect.value = 'H';
+            maxBytesSelect.value = '600';
+            errorLevelSelect.value = 'Q';
             break;
     }
     
