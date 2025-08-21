@@ -959,17 +959,22 @@ class QRDecoder {
     
     handleResult(text, fileItem) {
         // 检查是否是分片格式，支持多种格式
+        const doubleEncodingMatch = text.match(/^\[片段(\d+)\/(\d+):([a-z0-9]+)\]\n([\s\S]*)/);
         const base64Match = text.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+):([BT])\]([\s\S]*)/);
         const enhancedMatch = text.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
         const fragmentMatch = text.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (base64Match || enhancedMatch || fragmentMatch) {
-            const match = base64Match || enhancedMatch || fragmentMatch;
+        if (doubleEncodingMatch || base64Match || enhancedMatch || fragmentMatch) {
+            const match = doubleEncodingMatch || base64Match || enhancedMatch || fragmentMatch;
             const index = parseInt(match[1]);
             const total = parseInt(match[2]);
             let content, batchId, encoding;
             
-            if (base64Match) {
+            if (doubleEncodingMatch) {
+                batchId = doubleEncodingMatch[3];
+                encoding = 'T';
+                content = doubleEncodingMatch[4];
+            } else if (base64Match) {
                 batchId = base64Match[3];
                 encoding = base64Match[4];
                 content = base64Match[5];
@@ -1414,14 +1419,26 @@ class QRCameraScanner {
         // 播放提示音
         this.successSound();
         
-        // 检查是否是增强分片格式 [x/y:batch:encoding] 或 [x/y:batch] 或旧格式 [x/y]
-        // 支持可选的前导空格（用于改善第一片的扫描）
-        const base64Match = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+):([BT])\]([\s\S]*)/); // 新格式带编码
+        // 检查是否是分片格式，支持多种格式
+        // 新的双层编码格式：[片段x/总数:批次ID]\n内容
+        const doubleEncodingMatch = content.match(/^\[片段(\d+)\/(\d+):([a-z0-9]+)\]\n([\s\S]*)/);
+        // Base64格式：[x/y:batch:encoding]内容
+        const base64Match = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+):([BT])\]([\s\S]*)/);
+        // 增强格式：[x/y:batch]内容
         const enhancedMatch = content.match(/^\s*\[(\d+)\/(\d+):([a-z0-9]+)\]\s*([\s\S]*)/);
+        // 旧格式：[x/y]内容
         const legacyMatch = content.match(/^\s*\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
         
-        if (base64Match) {
-            // 新格式，包含编码标记
+        if (doubleEncodingMatch) {
+            // 双层编码格式（最新，其他软件友好）
+            const index = parseInt(doubleEncodingMatch[1]);
+            const total = parseInt(doubleEncodingMatch[2]);
+            const batchId = doubleEncodingMatch[3];
+            const text = doubleEncodingMatch[4];
+            
+            this.handleFragment(index, total, text, batchId, 'T');
+        } else if (base64Match) {
+            // Base64格式
             const index = parseInt(base64Match[1]);
             const total = parseInt(base64Match[2]);
             const batchId = base64Match[3];
