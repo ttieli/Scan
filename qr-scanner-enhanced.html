@@ -298,7 +298,7 @@ const fragments = new Map();
 let currentBatch = null;
 
 const ROI = { x:0.16, y:0.16, w:0.68, h:0.68 }; // 取景框与处理区域
-const FRAME_DECODE_EVERY = 2;  // 每2帧解码一次
+const FRAME_DECODE_EVERY = 1;  // 每帧都解码，提高识别率
 let frameCounter = 0;
 
 /** ================== 工具函数 ================== */
@@ -374,19 +374,41 @@ function updateFragmentsUI(){
   const batch = fragments.get(currentBatch);
   if (!batch) return;
   
+  // 添加进度条
+  const progressBar = document.createElement('div');
+  progressBar.style.cssText = 'width:100%; height:20px; background:#e0e0e0; border-radius:10px; margin-bottom:12px; overflow:hidden;';
+  const progressFill = document.createElement('div');
+  const progress = (batch.pieces.size / batch.total) * 100;
+  progressFill.style.cssText = `width:${progress}%; height:100%; background:#4CAF50; transition:width 0.3s;`;
+  progressBar.appendChild(progressFill);
+  
+  const progressText = document.createElement('div');
+  progressText.style.cssText = 'text-align:center; margin-bottom:12px; font-weight:600;';
+  progressText.textContent = `进度: ${batch.pieces.size}/${batch.total} (${Math.round(progress)}%)`;
+  
+  fragmentsList.appendChild(progressText);
+  fragmentsList.appendChild(progressBar);
+  
+  // 显示每个片段状态
+  const gridContainer = document.createElement('div');
+  gridContainer.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(60px, 1fr)); gap:8px; margin-top:12px;';
+  
   for (let i = 1; i <= batch.total; i++){
     const item = document.createElement('div');
-    item.className = 'fragment-item';
-    
     const hasFragment = batch.pieces.has(i);
-    item.innerHTML = `
-      <span>片段 ${i}/${batch.total}</span>
-      <span class="fragment-status" style="background:${hasFragment ? '#4CAF50' : '#ccc'}">
-        ${hasFragment ? '✓ 已扫描' : '等待中...'}
-      </span>
+    item.style.cssText = `
+      padding:8px; text-align:center; border-radius:8px;
+      background:${hasFragment ? '#4CAF50' : '#f5f5f5'};
+      color:${hasFragment ? 'white' : '#999'};
+      font-weight:600; font-size:14px;
+      border:2px solid ${hasFragment ? '#4CAF50' : '#ddd'};
+      ${batch.lastScanned === i ? 'animation: pulse 0.5s;' : ''}
     `;
-    fragmentsList.appendChild(item);
+    item.textContent = i;
+    gridContainer.appendChild(item);
   }
+  
+  fragmentsList.appendChild(gridContainer);
   
   // 检查是否完整
   if (batch.pieces.size === batch.total){
@@ -400,7 +422,7 @@ function updateFragmentsUI(){
     onDecodeSuccess(fullText, true);
     fragments.clear();
     currentBatch = null;
-    setTimeout(()=> fragmentsContainer.classList.remove('active'), 3000);
+    setTimeout(()=> fragmentsContainer.classList.remove('active'), 5000);
   }
 }
 
@@ -484,50 +506,9 @@ function extractROIImageData(){
   tmp.height = sh;
   tctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
   
-  let id = tctx.getImageData(0,0,sw,sh);
-  
-  // 增强预处理：灰度化 + 自适应二值化
-  const data = id.data;
-  const grayscale = new Uint8Array(sw * sh);
-  
-  // 转灰度
-  for (let i = 0, j = 0; i < data.length; i += 4, j++){
-    grayscale[j] = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
-  }
-  
-  // 局部自适应阈值
-  const blockSize = 15;
-  const offset = 10;
-  
-  for (let y = 0; y < sh; y++){
-    for (let x = 0; x < sw; x++){
-      const idx = y * sw + x;
-      
-      // 计算局部均值
-      let sum = 0, count = 0;
-      const halfBlock = Math.floor(blockSize / 2);
-      
-      for (let dy = -halfBlock; dy <= halfBlock; dy++){
-        for (let dx = -halfBlock; dx <= halfBlock; dx++){
-          const ny = y + dy, nx = x + dx;
-          if (ny >= 0 && ny < sh && nx >= 0 && nx < sw){
-            sum += grayscale[ny * sw + nx];
-            count++;
-          }
-        }
-      }
-      
-      const localMean = sum / count;
-      const threshold = localMean - offset;
-      const pixelValue = grayscale[idx] > threshold ? 255 : 0;
-      
-      const dataIdx = idx * 4;
-      data[dataIdx] = data[dataIdx+1] = data[dataIdx+2] = pixelValue;
-    }
-  }
-  
-  tctx.putImageData(id,0,0);
-  return id;
+  // 返回原始图像数据，不做过度处理
+  // 让解码器自己处理图像增强
+  return tctx.getImageData(0,0,sw,sh);
 }
 
 /** ================== WASM Worker ================== */
@@ -546,7 +527,9 @@ function createWasmWorker(){
           wasmUrl: '${ZXING_WASM_BIN}',
           formats: ['QRCode'],
           tryHarder: true,
-          tryRotate: true
+          tryRotate: true,
+          tryInvert: true,
+          maxNumberOfSymbols: 255
         });
         await reader.load();
         decoderReady = true;
@@ -555,6 +538,23 @@ function createWasmWorker(){
         postMessage({ type:'error', msg: String(e) });
       }
     }
+    
+    // 图像预处理
+    function preprocessImage(imageData){
+      const data = new Uint8ClampedArray(imageData.data);
+      const width = imageData.width;
+      const height = imageData.height;
+      
+      // 转换为灰度并增强对比度
+      for (let i = 0; i < data.length; i += 4){
+        const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+        // 简单的对比度增强
+        const enhanced = gray < 128 ? Math.max(0, gray - 20) : Math.min(255, gray + 20);
+        data[i] = data[i+1] = data[i+2] = enhanced;
+      }
+      
+      return new ImageData(data, width, height);
+    }
 
     onmessage = async (e) => {
       const { type, imageData } = e.data || {};
@@ -562,7 +562,15 @@ function createWasmWorker(){
       if (!decoderReady || !imageData) return postMessage({ type:'res', ok:false });
 
       try{
-        const res = await reader.decode(imageData);
+        // 尝试原始图像
+        let res = await reader.decode(imageData);
+        
+        // 如果失败，尝试预处理后的图像
+        if (!res?.text){
+          const processed = preprocessImage(imageData);
+          res = await reader.decode(processed);
+        }
+        
         if (res?.text) postMessage({ type:'res', ok:true, text: res.text });
         else postMessage({ type:'res', ok:false });
       }catch{
@@ -603,9 +611,18 @@ function loop(){
       useWorker.postMessage({ imageData: id }, [id.data.buffer]);
     } else {
       // 降级jsQR
-      const code = jsQR(id.data, id.width, id.height, { 
+      // 尝试多种增强方式
+      let code = jsQR(id.data, id.width, id.height, { 
         inversionAttempts: 'attemptBoth' 
       });
+      
+      // 如果失败，尝试增强对比度
+      if (!code){
+        const enhanced = enhanceImageData(id);
+        code = jsQR(enhanced.data, enhanced.width, enhanced.height, {
+          inversionAttempts: 'attemptBoth'
+        });
+      }
       busy = false;
       if (code && code.data){
         onDecode(code.data, 'jsQR');
@@ -637,18 +654,33 @@ function onDecode(text, decoder='zxing-wasm'){
       fragments.set(key, {
         total: parsed.total,
         pieces: new Map(),
-        batchId: parsed.batchId
+        batchId: parsed.batchId,
+        lastScanned: null
       });
     }
     
-    fragments.get(key).pieces.set(parsed.index, parsed.content);
-    currentBatch = key;
+    const batch = fragments.get(key);
     
-    toast(`扫描到片段 ${parsed.index}/${parsed.total}`);
-    updateFragmentsUI();
-    
-    // 播放音效（可选）
-    playBeep();
+    // 检查是否是新片段
+    if (!batch.pieces.has(parsed.index)){
+      batch.pieces.set(parsed.index, parsed.content);
+      batch.lastScanned = parsed.index;
+      currentBatch = key;
+      
+      // 显示详细提示
+      const remaining = parsed.total - batch.pieces.size;
+      if (remaining > 0){
+        toast(`✅ 片段 ${parsed.index}/${parsed.total} 已扫描，还需 ${remaining} 片`);
+      } else {
+        toast(`🎉 所有片段已收集完成！`);
+      }
+      
+      updateFragmentsUI();
+      playBeep();
+    } else {
+      // 重复片段，仅更新UI
+      toast(`⚠️ 片段 ${parsed.index} 已存在`, 1000);
+    }
   } else {
     // 单片直接显示
     onDecodeSuccess(text, false);
@@ -846,6 +878,63 @@ window.onload = () => {
   setDecoderTag('未初始化');
   console.log('增强版二维码扫描器已加载');
 };
+// 图像增强函数
+function enhanceImageData(imageData){
+  const data = new Uint8ClampedArray(imageData.data);
+  
+  // 计算直方图
+  const histogram = new Array(256).fill(0);
+  for (let i = 0; i < data.length; i += 4){
+    const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+    histogram[gray]++;
+  }
+  
+  // 找到有效的最小和最大值（忽略极端值）
+  const total = data.length / 4;
+  const threshold = total * 0.01; // 1%的像素
+  let min = 0, max = 255;
+  let count = 0;
+  
+  for (let i = 0; i < 256; i++){
+    count += histogram[i];
+    if (count > threshold){
+      min = i;
+      break;
+    }
+  }
+  
+  count = 0;
+  for (let i = 255; i >= 0; i--){
+    count += histogram[i];
+    if (count > threshold){
+      max = i;
+      break;
+    }
+  }
+  
+  // 对比度拉伸
+  const range = max - min;
+  if (range > 0){
+    for (let i = 0; i < data.length; i += 4){
+      const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+      const enhanced = Math.max(0, Math.min(255, ((gray - min) * 255) / range));
+      data[i] = data[i+1] = data[i+2] = enhanced;
+    }
+  }
+  
+  return new ImageData(data, imageData.width, imageData.height);
+}
+
+// 添加CSS动画
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+`;
+document.head.appendChild(style);
 </script>
 </body>
 </html>
