@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二维码扫描与解析工具</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    max-width: 800px;
+    width: 100%;
+}
+
+.tab-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+    color: #667eea;
+}
+
+.tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Camera styles */
+#scanner-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+#video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.scan-region {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    border: 2px solid #4CAF50;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.scan-region::before,
+.scan-region::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #4CAF50;
+}
+
+.scan-region::before {
+    top: -2px;
+    left: -2px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.scan-region::after {
+    top: -2px;
+    right: -2px;
+    border-left: none;
+    border-bottom: none;
+}
+
+.scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #4CAF50, transparent);
+    animation: scan 2s infinite;
+}
+
+@keyframes scan {
+    0% { top: 0; }
+    50% { top: calc(100% - 2px); }
+    100% { top: 0; }
+}
+
+#camera-status {
+    text-align: center;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+#camera-progress {
+    background: #e3f2fd;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.camera-progress-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #2196f3;
+}
+
+.camera-progress-items {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.camera-progress-item {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #2196f3;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    background: white;
+}
+
+.camera-progress-item.completed {
+    background: #2196f3;
+    color: white;
+    animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+#start-camera-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#start-camera-btn:hover {
+    background: #45a049;
+}
+
+#stop-camera-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    display: none;
+}
+
+#stop-camera-btn:hover {
+    background: #da190b;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.upload-area {
+    border: 3px dashed #667eea;
+    border-radius: 15px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #f8f9fa;
+}
+
+.upload-area:hover {
+    background: #e9ecef;
+    border-color: #764ba2;
+}
+
+.upload-area.dragover {
+    background: #e3f2fd;
+    border-color: #2196f3;
+}
+
+#fileInput {
+    display: none;
+}
+
+.upload-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.upload-text {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.upload-hint {
+    color: #999;
+    font-size: 14px;
+}
+
+.file-list {
+    margin-top: 20px;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.file-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+    margin-right: 10px;
+}
+
+.file-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.file-name {
+    font-size: 14px;
+    color: #495057;
+}
+
+.file-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: white;
+}
+
+.file-status.success {
+    background: #28a745;
+}
+
+.file-status.error {
+    background: #dc3545;
+}
+
+.file-status.fragment {
+    background: #17a2b8;
+}
+
+.clear-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 15px;
+    width: 100%;
+}
+
+.clear-btn:hover {
+    background: #c82333;
+}
+
+.fragment-info {
+    background: #e3f2fd;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.fragment-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.fragment-item {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #2196f3;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    background: white;
+}
+
+.fragment-item.completed {
+    background: #2196f3;
+    color: white;
+}
+
+#preview {
+    margin-top: 30px;
+    display: none;
+}
+
+#previewImage {
+    max-width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+#result {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f1f3f5;
+    border-radius: 10px;
+    display: none;
+}
+
+.result-title {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.result-content {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+#resultText {
+    padding-right: 10px;
+}
+
+.result-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.copy-btn, .clear-result-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.copy-btn {
+    background: #667eea;
+    color: white;
+}
+
+.copy-btn:hover {
+    background: #764ba2;
+}
+
+.copy-btn:active {
+    transform: scale(0.98);
+}
+
+.copy-btn.copied {
+    background: #4caf50;
+}
+
+.clear-result-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.clear-result-btn:hover {
+    background: #5a6268;
+}
+
+.clear-result-btn:active {
+    transform: scale(0.98);
+}
+
+.error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.processing {
+    text-align: center;
+    color: #667eea;
+    margin-top: 20px;
+    display: none;
+}
+
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #dee2e6;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-label {
+    color: #868e96;
+    font-size: 12px;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    color: #495057;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    
+    h1 {
+        font-size: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .tab-btn {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+    
+    .upload-area {
+        padding: 30px 20px;
+    }
+    
+    .upload-icon {
+        font-size: 36px;
+        margin-bottom: 15px;
+    }
+    
+    .upload-text {
+        font-size: 14px;
+    }
+    
+    .upload-hint {
+        font-size: 12px;
+    }
+    
+    #scanner-container {
+        height: 300px;
+    }
+    
+    .scan-region {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .result-content {
+        max-height: 150px;
+        font-size: 12px;
+        padding: 12px;
+    }
+    
+    .result-actions {
+        flex-direction: row;
+    }
+    
+    .copy-btn, .clear-result-btn {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+    
+    .stats {
+        padding-top: 10px;
+        margin-top: 10px;
+    }
+    
+    .stat-label {
+        font-size: 11px;
+    }
+    
+    .stat-value {
+        font-size: 14px;
+    }
+    
+    #result {
+        padding: 12px;
+    }
+    
+    .result-title {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+}
+
+/* 小屏幕手机优化 */
+@media (max-width: 380px) {
+    .container {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 18px;
+    }
+    
+    .tab-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    .upload-area {
+        padding: 25px 15px;
+    }
+    
+    .result-content {
+        max-height: 120px;
+    }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🔍 二维码扫描与解析工具</h1>
+    
+    <div class="tab-container">
+        <button class="tab-btn active" data-tab="upload">📷 图片解析</button>
+        <button class="tab-btn" data-tab="camera">📹 摄像头扫描</button>
+    </div>
+    
+    <div id="uploadTab" class="tab-content active">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📷</div>
+            <div class="upload-text">点击选择或拖拽二维码图片到这里</div>
+            <div class="upload-hint">支持多个图片上传 • 自动识别分片顺序</div>
+            <input type="file" id="fileInput" accept="image/*" multiple>
+        </div>
+        
+        <div id="fileList" class="file-list"></div>
+        
+        <div id="fragmentInfo" class="fragment-info" style="display: none;">
+            <div style="font-weight: bold; margin-bottom: 10px;">分片收集进度</div>
+            <div id="fragmentProgress" class="fragment-progress"></div>
+        </div>
+        
+        <div id="processing" class="processing">
+            <div class="spinner"></div>
+            <div>正在解析二维码...</div>
+        </div>
+    </div>
+    
+    <div id="cameraTab" class="tab-content">
+        <div id="scanner-container" style="display: none;">
+            <video id="video" playsinline></video>
+            <div id="overlay">
+                <div class="scan-region">
+                    <div class="scan-line"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="camera-status">摄像头未启动</div>
+        
+        <button id="start-camera-btn">开始扫描</button>
+        <button id="stop-camera-btn">停止扫描</button>
+        
+        <div id="camera-progress">
+            <div class="camera-progress-title">扫描进度</div>
+            <div class="camera-progress-items" id="camera-progress-items"></div>
+        </div>
+    </div>
+    
+    <div id="result">
+        <div class="result-title">解析结果</div>
+        <div class="result-content" id="resultContent">
+            <div id="resultText"></div>
+        </div>
+        <div class="result-actions">
+            <button class="copy-btn" id="copyBtn">📋 复制</button>
+            <button class="clear-result-btn" id="clearResultBtn">🗑️ 清除</button>
+        </div>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">字符数</div>
+                <div class="stat-value" id="charCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">数据类型</div>
+                <div class="stat-value" id="dataType">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">编码</div>
+                <div class="stat-value" id="encoding">UTF-8</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="error" class="error" style="display: none;"></div>
+</div>
+
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+class QRDecoder {
+    constructor() {
+        this.uploadArea = document.getElementById('uploadArea');
+        this.fileInput = document.getElementById('fileInput');
+        this.fileList = document.getElementById('fileList');
+        this.fragmentInfo = document.getElementById('fragmentInfo');
+        this.fragmentProgress = document.getElementById('fragmentProgress');
+        this.result = document.getElementById('result');
+        this.resultText = document.getElementById('resultText');
+        this.copyBtn = document.getElementById('copyBtn');
+        this.clearResultBtn = document.getElementById('clearResultBtn');
+        this.error = document.getElementById('error');
+        this.processing = document.getElementById('processing');
+        
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // 存储解析结果
+        this.fragments = new Map(); // 存储分片
+        this.results = []; // 存储单个二维码结果
+        
+        this.init();
+    }
+    
+    init() {
+        // 点击上传
+        this.uploadArea.addEventListener('click', () => {
+            this.fileInput.click();
+        });
+        
+        // 文件选择
+        this.fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                this.processFiles(files);
+            }
+        });
+        
+        // 拖拽上传
+        this.uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.add('dragover');
+        });
+        
+        this.uploadArea.addEventListener('dragleave', () => {
+            this.uploadArea.classList.remove('dragover');
+        });
+        
+        this.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            if (files.length > 0) {
+                this.processFiles(files);
+            }
+        });
+        
+        // 复制功能
+        this.copyBtn.addEventListener('click', () => {
+            this.copyToClipboard();
+        });
+        
+        // 清除结果功能
+        this.clearResultBtn.addEventListener('click', () => {
+            this.clearAllResults();
+        });
+    }
+    
+    clearAllResults() {
+        // 清空所有存储的数据
+        this.fragments.clear();
+        this.results = [];
+        this.fileList.innerHTML = '';
+        this.fragmentInfo.style.display = 'none';
+        this.result.style.display = 'none';
+        this.error.style.display = 'none';
+        this.fileInput.value = '';
+        
+        // 重置统计信息
+        document.getElementById('charCount').textContent = '0';
+        document.getElementById('dataType').textContent = '-';
+        this.resultText.textContent = '';
+        
+        // 如果摄像头扫描器存在，也清除其结果
+        if (window.cameraScanner) {
+            window.cameraScanner.clearCameraResults();
+        }
+    }
+    
+    async processFiles(files) {
+        // 清空之前的结果
+        this.clearResults();
+        
+        // 显示处理中状态
+        this.processing.style.display = 'block';
+        this.error.style.display = 'none';
+        
+        // 处理每个文件
+        for (const file of files) {
+            await this.processFile(file);
+        }
+        
+        // 隐藏处理中状态
+        this.processing.style.display = 'none';
+        
+        // 分析结果
+        this.analyzeResults();
+    }
+    
+    processFile(file) {
+        return new Promise((resolve) => {
+            const fileItem = this.createFileItem(file);
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // 更新文件项预览
+                    fileItem.querySelector('img').src = e.target.result;
+                    
+                    // 解析二维码
+                    const result = this.decodeQR(img);
+                    
+                    if (result) {
+                        this.handleResult(result, fileItem);
+                    } else {
+                        this.updateFileStatus(fileItem, 'error', '无法识别');
+                    }
+                    
+                    resolve();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    
+    createFileItem(file) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        
+        item.innerHTML = `
+            <div class="file-info">
+                <img src="" alt="预览">
+                <span class="file-name">${file.name}</span>
+            </div>
+            <span class="file-status">处理中...</span>
+        `;
+        
+        this.fileList.appendChild(item);
+        return item;
+    }
+    
+    updateFileStatus(fileItem, status, text) {
+        const statusEl = fileItem.querySelector('.file-status');
+        statusEl.className = `file-status ${status}`;
+        statusEl.textContent = text;
+    }
+    
+    decodeQR(img) {
+        // 设置canvas尺寸
+        this.canvas.width = img.width;
+        this.canvas.height = img.height;
+        
+        // 绘制图片
+        this.ctx.drawImage(img, 0, 0);
+        
+        // 获取图像数据
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 尝试多种解码方式
+        let code = null;
+        
+        // 1. 标准解码
+        code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        // 2. 如果失败，尝试反色
+        if (!code) {
+            const invertedData = this.invertImageData(imageData);
+            code = jsQR(invertedData.data, invertedData.width, invertedData.height);
+        }
+        
+        // 3. 尝试增强对比度
+        if (!code) {
+            const enhancedData = this.enhanceContrast(imageData);
+            code = jsQR(enhancedData.data, enhancedData.width, enhancedData.height);
+        }
+        
+        return code ? code.data : null;
+    }
+    
+    handleResult(text, fileItem) {
+        // 检查是否是分片格式 [x/y] content
+        const fragmentMatch = text.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        
+        if (fragmentMatch) {
+            const index = parseInt(fragmentMatch[1]);
+            const total = parseInt(fragmentMatch[2]);
+            const content = fragmentMatch[3];
+            
+            // 存储分片
+            const key = `fragments_${total}`;
+            if (!this.fragments.has(key)) {
+                this.fragments.set(key, {
+                    total: total,
+                    pieces: new Map()
+                });
+            }
+            
+            const group = this.fragments.get(key);
+            group.pieces.set(index, content);
+            
+            this.updateFileStatus(fileItem, 'fragment', `分片 ${index}/${total}`);
+        } else {
+            // 单个二维码
+            this.results.push(text);
+            this.updateFileStatus(fileItem, 'success', '已解析');
+        }
+    }
+    
+    analyzeResults() {
+        // 检查是否有分片需要合并
+        let hasFragments = false;
+        let mergedContent = '';
+        
+        for (const [key, group] of this.fragments) {
+            if (group.pieces.size === group.total) {
+                hasFragments = true;
+                
+                // 按序号排序并合并
+                const sortedTexts = [];
+                for (let i = 1; i <= group.total; i++) {
+                    if (group.pieces.has(i)) {
+                        sortedTexts.push(group.pieces.get(i));
+                    }
+                }
+                mergedContent = sortedTexts.join('');
+                
+                // 显示分片进度
+                this.showFragmentProgress(group);
+                break; // 只处理第一组完整的分片
+            } else if (group.pieces.size > 0) {
+                // 显示不完整的分片进度
+                this.showFragmentProgress(group);
+            }
+        }
+        
+        // 显示结果
+        if (hasFragments && mergedContent) {
+            this.showResult(mergedContent);
+        } else if (this.results.length > 0) {
+            // 显示第一个单独的二维码结果
+            this.showResult(this.results[0]);
+        } else if (this.fragments.size > 0) {
+            // 有不完整的分片
+            const firstGroup = Array.from(this.fragments.values())[0];
+            this.showError(`分片不完整：已收集 ${firstGroup.pieces.size}/${firstGroup.total} 片`);
+        }
+    }
+    
+    showFragmentProgress(group) {
+        this.fragmentInfo.style.display = 'block';
+        this.fragmentProgress.innerHTML = '';
+        
+        for (let i = 1; i <= group.total; i++) {
+            const item = document.createElement('div');
+            item.className = 'fragment-item';
+            item.textContent = i;
+            
+            if (group.pieces.has(i)) {
+                item.classList.add('completed');
+            }
+            
+            this.fragmentProgress.appendChild(item);
+        }
+    }
+    
+    clearResults() {
+        this.fragments.clear();
+        this.results = [];
+        this.fileList.innerHTML = '';
+        this.fragmentInfo.style.display = 'none';
+        this.result.style.display = 'none';
+        this.error.style.display = 'none';
+        
+        // 添加清空按钮
+        if (this.fileList.children.length === 0) {
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'clear-btn';
+            clearBtn.textContent = '清空所有';
+            clearBtn.style.display = 'none';
+            clearBtn.onclick = () => {
+                this.clearResults();
+                this.fileInput.value = '';
+            };
+        }
+    }
+    
+    invertImageData(imageData) {
+        const data = new Uint8ClampedArray(imageData.data);
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = 255 - data[i];       // R
+            data[i + 1] = 255 - data[i + 1]; // G
+            data[i + 2] = 255 - data[i + 2]; // B
+            // Alpha保持不变
+        }
+        return new ImageData(data, imageData.width, imageData.height);
+    }
+    
+    enhanceContrast(imageData) {
+        const data = new Uint8ClampedArray(imageData.data);
+        const factor = 1.5; // 对比度因子
+        
+        for (let i = 0; i < data.length; i += 4) {
+            // 增强对比度
+            data[i] = Math.min(255, (data[i] - 128) * factor + 128);
+            data[i + 1] = Math.min(255, (data[i + 1] - 128) * factor + 128);
+            data[i + 2] = Math.min(255, (data[i + 2] - 128) * factor + 128);
+        }
+        return new ImageData(data, imageData.width, imageData.height);
+    }
+    
+    showResult(text) {
+        this.resultText.textContent = text;
+        this.result.style.display = 'block';
+        
+        // 更新统计信息
+        document.getElementById('charCount').textContent = text.length;
+        
+        // 检测数据类型
+        let dataType = '文本';
+        if (text.startsWith('http://') || text.startsWith('https://')) {
+            dataType = 'URL';
+        } else if (text.includes('@') && text.includes('.')) {
+            dataType = 'Email';
+        } else if (/^\d+$/.test(text)) {
+            dataType = '数字';
+        } else if (text.startsWith('[') && text.includes('/')) {
+            dataType = '分片';
+        }
+        document.getElementById('dataType').textContent = dataType;
+    }
+    
+    showError(message) {
+        this.error.textContent = message;
+        this.error.style.display = 'block';
+    }
+    
+    async copyToClipboard() {
+        const text = this.resultText.textContent;
+        try {
+            await navigator.clipboard.writeText(text);
+            this.copyBtn.innerHTML = '✅ 已复制';
+            this.copyBtn.classList.add('copied');
+            
+            setTimeout(() => {
+                this.copyBtn.innerHTML = '📋 复制';
+                this.copyBtn.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            // 降级方案
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            this.copyBtn.innerHTML = '✅ 已复制';
+            this.copyBtn.classList.add('copied');
+            
+            setTimeout(() => {
+                this.copyBtn.innerHTML = '📋 复制';
+                this.copyBtn.classList.remove('copied');
+            }, 2000);
+        }
+    }
+}
+
+// Camera Scanner Class
+class QRCameraScanner {
+    constructor(decoder) {
+        this.decoder = decoder;
+        this.video = document.getElementById('video');
+        this.scannerContainer = document.getElementById('scanner-container');
+        this.startBtn = document.getElementById('start-camera-btn');
+        this.stopBtn = document.getElementById('stop-camera-btn');
+        this.cameraStatus = document.getElementById('camera-status');
+        this.cameraProgress = document.getElementById('camera-progress');
+        this.cameraProgressItems = document.getElementById('camera-progress-items');
+        
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.scanning = false;
+        this.cameraFragments = new Map();
+        this.lastScannedContent = null;
+        this.scanCooldown = false;
+        this.stream = null;
+        
+        this.initCamera();
+    }
+    
+    initCamera() {
+        // 检查是否在安全上下文中（HTTPS或localhost）
+        if (!window.isSecureContext) {
+            this.cameraStatus.textContent = '⚠️ 相机功能需要HTTPS或localhost环境';
+            this.startBtn.disabled = true;
+            return;
+        }
+        
+        this.startBtn.addEventListener('click', () => this.startCamera());
+        this.stopBtn.addEventListener('click', () => this.stopCamera());
+    }
+    
+    async startCamera() {
+        try {
+            this.cameraStatus.textContent = '正在请求相机权限...';
+            this.scannerContainer.style.display = 'block';
+            
+            // 先检查是否支持getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('您的浏览器不支持相机功能');
+            }
+            
+            // 请求相机权限
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            });
+            
+            this.video.srcObject = this.stream;
+            
+            // 等待视频元数据加载
+            await new Promise((resolve) => {
+                this.video.onloadedmetadata = () => {
+                    resolve();
+                };
+            });
+            
+            await this.video.play();
+            this.cameraStatus.textContent = '将二维码对准扫描框';
+            this.startBtn.style.display = 'none';
+            this.stopBtn.style.display = 'block';
+            this.startScanning();
+            
+        } catch (error) {
+            console.error('Camera error:', error);
+            let errorMsg = '无法访问相机';
+            
+            if (error.name === 'NotAllowedError') {
+                errorMsg = '相机权限被拒绝，请在浏览器设置中允许相机访问';
+            } else if (error.name === 'NotFoundError') {
+                errorMsg = '未找到相机设备';
+            } else if (error.name === 'NotReadableError') {
+                errorMsg = '相机被其他应用占用';
+            } else if (error.message.includes('不支持')) {
+                errorMsg = error.message;
+            }
+            
+            this.cameraStatus.textContent = errorMsg;
+            this.scannerContainer.style.display = 'none';
+            this.startBtn.style.display = 'block';
+        }
+    }
+    
+    stopCamera() {
+        this.scanning = false;
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        this.video.srcObject = null;
+        this.scannerContainer.style.display = 'none';
+        this.startBtn.style.display = 'block';
+        this.stopBtn.style.display = 'none';
+        this.cameraStatus.textContent = '摄像头已关闭';
+        this.cameraProgress.style.display = 'none';
+        this.cameraFragments.clear();
+    }
+    
+    startScanning() {
+        this.scanning = true;
+        this.scan();
+    }
+    
+    scan() {
+        if (!this.scanning) return;
+        
+        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+            this.ctx.drawImage(this.video, 0, 0);
+            
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert'
+            });
+            
+            if (code && !this.scanCooldown) {
+                this.handleQRCode(code.data);
+            }
+        }
+        
+        requestAnimationFrame(() => this.scan());
+    }
+    
+    handleQRCode(content) {
+        // 避免重复扫描同一个码
+        if (content === this.lastScannedContent) return;
+        
+        this.lastScannedContent = content;
+        this.scanCooldown = true;
+        setTimeout(() => {
+            this.scanCooldown = false;
+            this.lastScannedContent = null;
+        }, 1000);
+        
+        // 震动反馈（如果支持）
+        if (navigator.vibrate) {
+            navigator.vibrate(100);
+        }
+        
+        // 检查是否是分片格式 [x/y]
+        const fragmentMatch = content.match(/^\[(\d+)\/(\d+)\]\s*([\s\S]*)/);
+        
+        if (fragmentMatch) {
+            const index = parseInt(fragmentMatch[1]);
+            const total = parseInt(fragmentMatch[2]);
+            const text = fragmentMatch[3];
+            
+            this.handleFragment(index, total, text);
+        } else {
+            // 单个二维码，直接显示结果
+            this.decoder.showResult(content);
+            this.cameraStatus.textContent = '扫描成功！继续扫描或清除结果重新开始';
+        }
+    }
+    
+    clearCameraResults() {
+        // 清空摄像头扫描的分片数据
+        this.cameraFragments.clear();
+        this.lastScannedContent = null;
+        this.scanCooldown = false;
+        this.cameraProgress.style.display = 'none';
+        this.cameraProgressItems.innerHTML = '';
+        
+        if (this.scanning) {
+            this.cameraStatus.textContent = '将二维码对准扫描框';
+        }
+    }
+    
+    handleFragment(index, total, text) {
+        // 使用total作为key来分组相同总数的片段
+        const key = `camera_group_${total}`;
+        
+        if (!this.cameraFragments.has(key)) {
+            this.cameraFragments.set(key, {
+                total: total,
+                pieces: new Map()
+            });
+        }
+        
+        const group = this.cameraFragments.get(key);
+        group.pieces.set(index, text);
+        
+        // 更新进度显示
+        this.updateCameraProgress(group);
+        
+        // 检查是否收集完整
+        if (group.pieces.size === total) {
+            // 按序号排序并合并
+            const sortedTexts = [];
+            for (let i = 1; i <= total; i++) {
+                if (group.pieces.has(i)) {
+                    sortedTexts.push(group.pieces.get(i));
+                }
+            }
+            
+            const fullText = sortedTexts.join('');
+            this.decoder.showResult(fullText);
+            this.cameraStatus.textContent = `已完成！全部 ${total} 片已合并`;
+            
+            // 清理
+            this.cameraFragments.delete(key);
+            setTimeout(() => {
+                this.cameraProgress.style.display = 'none';
+            }, 3000);
+        } else {
+            this.cameraStatus.textContent = `已扫描 ${group.pieces.size}/${total} 片`;
+        }
+    }
+    
+    updateCameraProgress(group) {
+        this.cameraProgress.style.display = 'block';
+        this.cameraProgressItems.innerHTML = '';
+        
+        for (let i = 1; i <= group.total; i++) {
+            const item = document.createElement('div');
+            item.className = 'camera-progress-item';
+            item.textContent = i;
+            
+            if (group.pieces.has(i)) {
+                item.classList.add('completed');
+            }
+            
+            this.cameraProgressItems.appendChild(item);
+        }
+    }
+}
+
+// 启动解码器
+const decoder = new QRDecoder();
+const cameraScanner = new QRCameraScanner(decoder);
+
+// 将摄像头扫描器暴露到全局，以便decoder可以访问
+window.cameraScanner = cameraScanner;
+
+// Tab switching
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetTab = btn.dataset.tab;
+        
+        // Update active states
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        tabContents.forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        if (targetTab === 'upload') {
+            document.getElementById('uploadTab').classList.add('active');
+            // Stop camera when switching away
+            if (cameraScanner.stream) {
+                cameraScanner.stopCamera();
+            }
+        } else if (targetTab === 'camera') {
+            document.getElementById('cameraTab').classList.add('active');
+        }
+    });
+});
+</script>
+</body>
+</html>
