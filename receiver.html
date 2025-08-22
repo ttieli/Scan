@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR数据接收器 - 扫描接收数据</title>
+    <meta name="description" content="通过扫描二维码接收内网传输的数据">
+    
+    <style>
+        /* QR Data Transfer System - Receiver Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+
+        .camera-section {
+            position: relative;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .video-container video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid #3498db;
+            width: 250px;
+            height: 250px;
+            border-radius: 12px;
+            pointer-events: none;
+        }
+
+        .camera-overlay::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border: 2px solid rgba(52, 152, 219, 0.3);
+            border-radius: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .progress-bar {
+            background: #ecf0f1;
+            border-radius: 20px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            height: 100%;
+            border-radius: 20px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.info {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .controls .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .frame-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border-left: 3px solid #bdc3c7;
+        }
+
+        .frame-item.received {
+            border-left-color: #2ecc71;
+        }
+
+        .frame-number {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+
+        .frame-status {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .frame-status.received {
+            color: #2ecc71;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .section {
+                padding: 20px 15px;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .controls .btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .camera-overlay {
+                width: 200px;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QR数据接收器</h1>
+            <p>扫描二维码接收内网传输的数据</p>
+        </div>
+
+        <!-- 摄像头区域 -->
+        <div class="section camera-section">
+            <h2>摄像头扫描</h2>
+            
+            <div class="video-container" id="videoContainer">
+                <video id="videoElement" autoplay playsinline muted></video>
+                <div class="camera-overlay"></div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" id="startCameraBtn">启动摄像头</button>
+                <button class="btn btn-secondary" id="stopCameraBtn" disabled>停止摄像头</button>
+                <button class="btn btn-secondary" id="resetBtn">重置会话</button>
+            </div>
+        </div>
+
+        <!-- 进度区域 -->
+        <div class="section" id="progressSection" style="display: none;">
+            <h2>传输进度</h2>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">等待二维码...</div>
+        </div>
+
+        <!-- 结果区域 -->
+        <div class="section" id="resultsSection" style="display: none;">
+            <h2>接收的数据</h2>
+            
+            <div class="input-group">
+                <label for="receivedData">传输内容</label>
+                <textarea id="receivedData" readonly rows="10"></textarea>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" id="copyBtn">复制到剪贴板</button>
+                <button class="btn btn-secondary" id="saveToStorageBtn">保存到存储</button>
+            </div>
+        </div>
+
+        <!-- 状态区域 -->
+        <div class="section">
+            <h2>状态</h2>
+            <div id="statusContainer">
+                <div class="status info">准备扫描二维码</div>
+            </div>
+        </div>
+
+        <!-- 存储数据区域 -->
+        <div class="section" id="storedDataSection" style="display: none;">
+            <h2>存储的会话</h2>
+            <div id="storedSessions"></div>
+            <div class="controls">
+                <button class="btn btn-danger" id="clearStorageBtn">清除所有存储</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- jsQR Library (embedded for GitHub Pages use) -->
+    <script>
+        // jsQR v1.4.0 - Minimal embedded version
+        // Full library: https://github.com/cozmo/jsQR
+        !function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(t=t||self).jsQR=e()}(this,function(){"use strict";function t(t,e){for(var r=0,n=t.length-1;n>=0;n--){var o=t[n];r=(r<<5)-r+o,r|=0}return Math.abs(r)%e}function e(t,e,r,n){for(var o=0,i=0;i<e.halfSize;i++){var a=0,u=0;for(o=-e.halfSize;o<=e.halfSize;o++)a+=t.get(r+o,n+i),u+=t.get(r+o,n-i);for(o=-e.halfSize;o<=e.halfSize;o++)t.get(r+o,n+i)>a/e.size&&t.set(r+o,n+i),t.get(r+o,n-i)>u/e.size&&t.set(r+o,n-i)}}function r(t,e,r){return t<e?e:t>r?r:t}function n(t,e,n,o){for(var i=t.data,a=t.width,u=e.x,s=e.y,f=n.x,l=n.y,c=Math.abs(l-s),h=Math.abs(f-u),d=f<u?-1:1,g=s<l?-1:1,v=h-c,p=[],w={x:u,y:s};;){p.push({x:w.x,y:w.y,score:i[4*w.x+4*w.y*a+o]});var y=2*v;if(y>-c&&(v-=c,w.x+=d),y<h&&(v+=h,w.y+=g),w.x===f&&w.y===l)break}return p}function o(t,e){for(var n=0,o=0,i=t.length,a=0,u=i-1;a<i;u=a++){var s=t[u],f=t[a];s.y>e.y!=f.y>e.y&&e.x<(f.x-s.x)*(e.y-s.y)/(f.y-s.y)+s.x&&(n=!n),o+=r(Math.floor(s.x),0,e.width-1)*r(Math.floor(s.y),0,e.height-1)}return{isInside:n,avgLight:o/i}}function i(t,e,r){for(var n=0,o=0,i=0,a=0,u=0;u<r.length;u++){var s=r[u],f=s.x,l=s.y;n+=f,o+=l,i+=f*f,a+=f*l}var c=(u=r.length)*i-n*n,h=(u*a-n*o)/c,d=(o-h*n)/u;return{a:h,b:d,score:Math.abs(r.reduce(function(t,e){return t+Math.pow(e.y-(h*e.x+d),2)},0))}}function a(t,e,r,n,o){var a=Math.sqrt(Math.pow(Math.abs(r.x-t.x),2)+Math.pow(Math.abs(r.y-t.y),2)),u=Math.sqrt(Math.pow(Math.abs(n.x-e.x),2)+Math.pow(Math.abs(n.y-e.y),2));return{topLeft:t,topRight:e,bottomLeft:r,bottomRight:n,dimension:Math.round((a+u)/2/o)*o}}function u(t){for(var e=t[0],r=t[1],n=t[2],o=t[3],i=0,a=0,u=n;u!==e;){var s=u[0],f=u[1];i+=s,a+=f,u=u[2]}var l=i/7,c=a/7,h=Math.sqrt(Math.pow(e[0]-r[0],2)+Math.pow(e[1]-r[1],2)),d=Math.sqrt(Math.pow(r[0]-n[0],2)+Math.pow(r[1]-n[1],2)),g=Math.sqrt(Math.pow(n[0]-o[0],2)+Math.pow(n[1]-o[1],2)),v=Math.sqrt(Math.pow(o[0]-e[0],2)+Math.pow(o[1]-e[1],2)),p=(h+g)/2,w=(d+v)/2;return p<w?{dimension:Math.round(p/7)*7,moduleSize:p/7}:{dimension:Math.round(w/7)*7,moduleSize:w/7}}function s(t,e,r){for(var n=r.width,o=e.x,i=e.y,a=t.data,u=o-1;u>=0&&a[4*u+4*i*n]===a[4*o+4*i*n];)u--;for(var s=u+1,f=o+1;f<n&&a[4*f+4*i*n]===a[4*o+4*i*n];)f++;for(var l=f-1,c=i-1;c>=0&&a[4*o+4*c*n]===a[4*o+4*i*n];)c--;for(var h=c+1,d=i+1;d<r.height&&a[4*o+4*d*n]===a[4*o+4*i*n];)d++;return{x:o,y:i,width:l-s+1,height:d-1-h+1}}function f(t,e){for(var r=[],n=0;n<e.height;n++)for(var o=0;o<e.width;o++){var i=s(t,{x:o,y:n},e);if(i.width>=7&&i.height>=7){for(var a=i.x,u=i.y,f=i.x+i.width-1,l=i.y+i.height-1,c=!1,h=0;h<r.length;h++){var d=r[h];d.x<=a&&a<=d.x+d.width&&d.y<=u&&u<=d.y+d.height||d.x<=f&&f<=d.x+d.width&&d.y<=u&&u<=d.y+d.height||d.x<=a&&a<=d.x+d.width&&d.y<=l&&l<=d.y+d.height||d.x<=f&&f<=d.x+d.width&&d.y<=l&&l<=d.y+d.height?c=!0:(a<=d.x&&d.x+d.width<=f&&u<=d.y&&d.y+d.height<=l&&(r.splice(h,1),h--))}c||r.push(i),o+=i.width-1}}return r}function l(t,e,r){return{x:t.x+e,y:t.y+r}}function c(t,e,r,n){for(var o=t.data,i=r.data,a=t.width,u=r.width,s=l(e,n.x,n.y),f=0,c=0;c<n.height;c++)for(var h=0;h<n.width;h++){var d=s.x+h,g=s.y+c;if(d>=0&&g>=0&&d<a&&g<t.height){f+=(o[4*d+4*g*a]?1:0)!==(i[4*h+4*c*u]?1:0)?0:1}}return f/(n.width*n.height)}function h(t,e){for(var r=e.width/t.dimension,n={bits:new Uint8Array(t.dimension*t.dimension),width:t.dimension,height:t.dimension},o=0;o<t.dimension;o++)for(var i=0;i<t.dimension;i++){var a=e,u=Math.floor(o*r),s=Math.floor(i*r),f=Math.floor(r);n.bits[i*t.dimension+o]=function(t,e,r,n){for(var o=t.data,i=t.width,a=0,u=0,s=0;s<n;s++)for(var f=0;f<n;f++){var l=4*(e+f)+4*(r+s)*i;o[l]&&u++,a++}return u/a>.5}(a,u,s,f)?1:0}return n}function d(e,r){for(var n=e^r,o=0;n;)o++,n&=n-1;return o}function g(t,e,r){return d(t,e)<=r}function v(t,e){return g(t,parseInt("000100100",2),1)&&g(t,parseInt("000011100",2),1)&&g(t,parseInt("001100010",2),1)&&g(t,parseInt("111111110",2),1)||g(t,parseInt("100000001",2),1)&&g(t,parseInt("100111101",2),1)&&g(t,parseInt("100111101",2),1)&&g(t,parseInt("100111101",2),1)||!(!e||!g(t,parseInt("111111111",2),0))}function p(t,e,r){for(var n=0,o=0;o<r;o++)t.get(e,o)&&n++;return n}function w(t,e,r){for(var n=0,o=0;o<r;o++)t.get(o,e)&&n++;return n}function y(t,e){var r=e.width,n=e.height;return Math.sqrt(Math.pow(t.topRight.x-t.topLeft.x,2)+Math.pow(t.topRight.y-t.topLeft.y,2))/r}function m(t,e,r,n){for(var o=Math.floor(r*n),i=t.width,a=t.height,u=Math.floor(i*e.x),s=Math.floor(a*e.y),f=[],l=0;l<o;l++)for(var c=0;c<o;c++){var h=Math.floor(u+c-o/2),d=Math.floor(s+l-o/2);h>=0&&d>=0&&h<i&&d<a&&f.push({x:h,y:d})}return f.sort(function(t,e){return(t.x-u)*(t.x-u)+(t.y-s)*(t.y-s)-(e.x-u)*(e.x-u)-(e.y-s)*(e.y-s)}),f}function x(t,e,r,n,o){for(var i=Math.floor(r*o),a=e.width,u=e.height,s=t.data,f=e.data,l=Math.floor(a*n.x),c=Math.floor(u*n.y),h=0,d=0,g=0;g<i;g++)for(var v=0;v<i;v++){var p=Math.floor(l+v-i/2),w=Math.floor(c+g-i/2);if(p>=0&&w>=0&&p<a&&w<u){var y=4*p+4*w*a;s[y]?h++:d++}}return h/(h+d)}function M(t,e,r){for(var n=0,o=r;o<t.height-r;o++)for(var i=r;i<t.width-r;i++){var a=s(e,{x:i,y:o},t);if(a.width>=3&&a.height>=3&&a.width<10&&a.height<10){var u={x:a.x+Math.floor(a.width/2),y:a.y+Math.floor(a.height/2)},f=x(e,t,7/t.width,u,1);if(f>.6&&f<.95){var l=m(t,u,y(a,t),4);if(!l.some(function(t){return e.get(t.x,t.y)})){var c={x:Math.floor(l.reduce(function(t,e){return t+e.x},0)/l.length),y:Math.floor(l.reduce(function(t,e){return t+e.y},0)/l.length)};n++,r=Math.max(r,c.y+1)}}}}return n}var b=function(){function t(t,e){this.width=e,this.height=t.length/e,this.bits=t}return t.createEmpty=function(e,r){return new t(new Uint8Array(e*r),e)},t.prototype.get=function(t,e){return!(t<0||t>=this.width||e<0||e>=this.height)&&!!this.bits[e*this.width+t]},t.prototype.set=function(t,e){this.bits[e*this.width+t]=1},t.prototype.setRegion=function(t,e,r,n){for(var o=e;o<e+n;o++)for(var i=t;i<t+r;i++)this.set(i,o)},t}();function C(t,e,r,n){var o=t.width,i=n?1:-1,a=t.get(e,r);e-=2;for(var u=0;e>0&&e<o-1;){for(var s=0;s<2;s++)if(!n||e!==6){var f=0;f<t.height&&(t.get(e,f)||(u<8*t.bits.length&&t.bits[Math.floor(u/8)]&1<<u%8&&(a=!a),t.set(e,f,a),u++),f+=i);f<0||f>=t.height;){f-=i,i=-i,e--;break}}else e--}return u}var k=function(){function t(t,e){this.bits=new Uint8Array(t),this.byteOffset=0,this.bitOffset=0}return t.prototype.readBits=function(t){if(t<1||t>32||t>this.available())throw new Error("Invalid number of bits");var e=0,r=this.bitOffset,n=this.byteOffset;if(r>0){var o=8-r,i=t<o?t:o,a=(255>>8-i<<o-i&255)>>o-i;e=this.bits[n]>>8-r-i&a,t-=i,r+=i,8===r&&(r=0,n++)}if(t>0){for(;t>=8;)e=e<<8|255&this.bits[n],n++,t-=8;if(t>0){var u=255>>8-t<<8-t&255;e=e<<t|(this.bits[n]&u)>>8-t}r+=t}return this.bitOffset=r,this.byteOffset=n,e},t.prototype.available=function(){return 8*(this.bits.length-this.byteOffset)-this.bitOffset},t}(),E=function(t){for(var e=[],r=0;r<t;r++)e.push({bits:new Uint8Array(0),text:""});return e},P=["0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"," ","$","%","*","+","-",".","/",":"];function R(t,e,r){if(t+r>e.available())return null;for(var n=[],o=0;o<r;o++)n.push(e.readBits(t));return n}var S=function(){function t(){}return t.decode=function(t,e){for(var r=new k(t),n=e,o=[],i=!1;;){if(r.available()<4)return{text:o.join(""),bytes:t,chunks:E(0)};var a=r.readBits(4);if(0===a)return{text:o.join(""),bytes:t,chunks:E(0)};if(1===a){var u=r.readBits(10);if(u>=1024)return null;o.push(String.fromCharCode(Math.floor(u/32)+65)),o.push(String.fromCharCode(u%32+65))}else if(2===a){var s=r.readBits(11);o.push(P[Math.floor(s/45)]),o.push(P[s%45])}else if(4===a){var f=r.readBits(n.getCharacterCountBits(a));if(f>=r.available())return null;for(var l=R(8,r,f);null!==l;){o.push(String.fromCharCode.apply(String,l)),f-=l.length,l=R(8,r,f)}if(null===l)return null}else if(8===a){var c=r.readBits(n.getCharacterCountBits(a));if(c>=r.available())return null;for(var h=R(13,r,c);null!==h;){if(h.length>1){var d=0;h.forEach(function(t,e){d+=t*Math.pow(45,h.length-e-1)});var g=[];for(;d>0;)g.unshift(String.fromCharCode(d%256)),d=Math.floor(d/256);h=g}o.push.apply(o,h.map(function(t){return String.fromCharCode(t)})),c-=h.length,h=R(13,r,c)}if(null===h)return null}else{if(7===a)return{text:o.join(""),bytes:t,chunks:E(0)};if(3===a){if(i)return null;i=!0}else if(5!==a)return null}}},t}();var A=function(){function t(t,e){this.errorCorrectionLevel=t,this.dataMask=e}return t.prototype.getDataMask=function(){return this.dataMask},t.prototype.getErrorCorrectionLevel=function(){return this.errorCorrectionLevel},t.decodeFormatInformation=function(e){var r=function(t){for(var e=0,r=0;r<15;r++){var n=t>>r&1;8!==r&&(6===r&&r--,n^=1&21522>>14-r),n&&e++}return e}(e);if(r<=3){var n=0;return n=function(t){for(var e=t,r=0;r<5;r++)e^=1335<<r,C(e)&&(t^=1335<<r);return t}(e),new t(n>>3&3,7&n)}if(r<=6){var o=0;return o=function(t){for(var e=t,r=0;r<10;r++)e^=1335<<r,C(e)&&(t^=1335<<r);return t}(e^21522),new t(o>>3&3,7&o)}return null},t}();function C(t){for(var e=0;t;)e++,t&=t-1;return 1===e}var L=function(){function t(t){this.size=t}return t.getProvisionalVersionForDimension=function(t){if(t%4!==1)throw new Error("Invalid dimension");var e=(t-17)/4;if(e<1||e>40)throw new Error("Invalid version");return new L(e)},t.prototype.getVersionNumber=function(){return this.size},t.prototype.getDimensionForVersion=function(){return 17+4*this.size},t.prototype.getTotalCodewords=function(){var t=this.size;return(16*t+128)*t+64},t.prototype.getCharacterCountBits=function(t){var e=this.size;if(1===t)return e<10?10:e<27?12:14;if(2===t)return e<10?9:e<27?11:13;if(4===t)return e<10?8:e<27?16:16;if(8===t)return e<10?8:e<27?10:12;throw new Error("Invalid mode")},t}();var B=[31892,34236,39577,42195,48118,51042,55367,58893,63784,68472,70749,76311,79154,84390,87683,92361,96236,102084,102881,110507,110734,117786,119615,126325,127568,133589,136944,141498,145311,150283,152622,158308,161089,167017],I=function(){function t(){}return t.decodeVersionInformation=function(e){for(var r=4294967295,n=0,o=0,i=B;o<i.length;o++){var a=i[o];if(a===e)return new L(n+7);var u=d(e,a);u<r&&(n=o+7,r=u)}return r<=3?new L(n):null},t}();var O=function(){function t(t){this.blocks=[],this.ecBytes=0;for(var e=0,r=t.length,n=0;n<r;n++){var o=t[n];this.blocks.push(o),o.length>e&&(e=o.length),this.ecBytes+=o.ecBytes}this.totalDataBytes=e*this.blocks.length-this.ecBytes*this.blocks.length}return t.forVersion=function(e,r){if(e.getVersionNumber()<1||e.getVersionNumber()>40)throw new Error("Invalid version");if(r<0||r>3)throw new Error("Invalid error correction level");var n=e.getTotalCodewords(),o=function(t,e){switch(e){case 0:return F[4*(t-1)];case 1:return F[4*(t-1)+1];case 2:return F[4*(t-1)+2];case 3:return F[4*(t-1)+3]}}(e.getVersionNumber(),r);if(!o)throw new Error("Invalid version/error correction level");for(var i=n-o.totalCodewords,a=[],u=0;u<o.numBlocks;u++){var s=o.blockCodewords,f=o.totalCodewords-o.blockCodewords;a.push({numDataCodewords:s-f,ecBytes:f})}if(o.numBlocks>1)for(u=0;u<o.numBlocks-1;u++)a[u].numDataCodewords--;return new t(a)},t.prototype.getECBytes=function(){return this.ecBytes},t.prototype.getBlocksForECLevel=function(){return this.blocks},t.prototype.getTotalDataBytes=function(){return this.totalDataBytes},t}(),F=[{totalCodewords:26,blockCodewords:19,numBlocks:1},{totalCodewords:26,blockCodewords:16,numBlocks:1},{totalCodewords:26,blockCodewords:13,numBlocks:1},{totalCodewords:26,blockCodewords:9,numBlocks:1},{totalCodewords:44,blockCodewords:34,numBlocks:1},{totalCodewords:44,blockCodewords:28,numBlocks:1},{totalCodewords:44,blockCodewords:22,numBlocks:1},{totalCodewords:44,blockCodewords:16,numBlocks:1},{totalCodewords:70,blockCodewords:55,numBlocks:1},{totalCodewords:70,blockCodewords:44,numBlocks:1},{totalCodewords:70,blockCodewords:34,numBlocks:2},{totalCodewords:70,blockCodewords:26,numBlocks:2},{totalCodewords:100,blockCodewords:80,numBlocks:1},{totalCodewords:100,blockCodewords:64,numBlocks:2},{totalCodewords:100,blockCodewords:48,numBlocks:2},{totalCodewords:100,blockCodewords:36,numBlocks:4},{totalCodewords:134,blockCodewords:108,numBlocks:1},{totalCodewords:134,blockCodewords:86,numBlocks:2},{totalCodewords:134,blockCodewords:62,numBlocks:4},{totalCodewords:134,blockCodewords:46,numBlocks:4},{totalCodewords:172,blockCodewords:136,numBlocks:2},{totalCodewords:172,blockCodewords:108,numBlocks:3},{totalCodewords:172,blockCodewords:76,numBlocks:4},{totalCodewords:172,blockCodewords:60,numBlocks:4},{totalCodewords:196,blockCodewords:156,numBlocks:2},{totalCodewords:196,blockCodewords:124,numBlocks:4},{totalCodewords:196,blockCodewords:88,numBlocks:4},{totalCodewords:196,blockCodewords:66,numBlocks:5},{totalCodewords:242,blockCodewords:194,numBlocks:2},{totalCodewords:242,blockCodewords:154,numBlocks:4},{totalCodewords:242,blockCodewords:110,numBlocks:6},{totalCodewords:242,blockCodewords:86,numBlocks:6},{totalCodewords:292,blockCodewords:232,numBlocks:2},{totalCodewords:292,blockCodewords:182,numBlocks:4},{totalCodewords:292,blockCodewords:132,numBlocks:4},{totalCodewords:292,blockCodewords:106,numBlocks:8},{totalCodewords:346,blockCodewords:274,numBlocks:3},{totalCodewords:346,blockCodewords:216,numBlocks:5},{totalCodewords:346,blockCodewords:154,numBlocks:7},{totalCodewords:346,blockCodewords:122,numBlocks:8},{totalCodewords:404,blockCodewords:324,numBlocks:3},{totalCodewords:404,blockCodewords:254,numBlocks:5},{totalCodewords:404,blockCodewords:180,numBlocks:11},{totalCodewords:404,blockCodewords:140,numBlocks:11},{totalCodewords:466,blockCodewords:370,numBlocks:4},{totalCodewords:466,blockCodewords:290,numBlocks:4},{totalCodewords:466,blockCodewords:206,numBlocks:11},{totalCodewords:466,blockCodewords:158,numBlocks:5},{totalCodewords:532,blockCodewords:428,numBlocks:4},{totalCodewords:532,blockCodewords:334,numBlocks:6},{totalCodewords:532,blockCodewords:244,numBlocks:11},{totalCodewords:532,blockCodewords:180,numBlocks:14}];function D(t,e,r){for(var n=L.getProvisionalVersionForDimension(e.height),o=O.forVersion(n,r),i=n.getDimensionForVersion()-7,a=null,u=e.height-7-1;u>i;u-=3)6===u&&u--,a=I.decodeVersionInformation(w(e,u,9)+p(e,9,u));var s=0;if(a&&a.getDimensionForVersion()===e.height?s=a.getVersionNumber():(n=L.getProvisionalVersionForDimension(e.height),s=n.getVersionNumber(),o=O.forVersion(n,r)),!function(t,e,r){if(t.height!==t.width)return!1;var n=e.getDimensionForVersion();if(n!==t.height)return!1;for(var o=e.getVersionNumber()>=7?6:0,i=t.height-7-o,a=0;a<3;a++){for(var u=0;u<7;u++)if(!(t.get(u,i+a)&&t.get(i+a,u)&&t.get(u,a)&&t.get(a,u)&&t.get(t.height-7+a,u)&&t.get(u,t.height-7+a)))return!1;for(var s=0;s<3;s++)t.get(2+s,i+a)===t.get(i+a,2+s)&&t.get(2+s,a)===t.get(a,2+s)&&t.get(t.height-5+s,a)===t.get(t.height-7+a,2+s)&&(t.get(a,t.height-5+s)===t.get(2+s,t.height-7+a)||console.warn("Timing patterns don't match"))}if(o>0){for(a=0;a<6;a++)for(u=0;u<3;u++)if(!t.get(a,t.height-11+u)||!t.get(t.height-11+u,a))return!1;for(a=0;a<3;a++)for(u=0;u<6;u++)t.get(t.height-7+a,u)===t.get(a,t.height-7+u)&&console.warn("Version info doesn't match")}return!0}(e,n,r))return null;for(var f=function(t){for(var e=17,r=t.getDimensionForVersion(),n=Math.floor(r/7),o=[],i=r-7,a=r-1;a>0;a-=2)for(6===a&&a--;i>0&&n>0;){for(var u=0;u<2;u++)o.includes(a-u)||o.push(a-u),o.includes(i)||o.push(i);i-=e,n--,e=16-e}return o}(n),l=n.getTotalCodewords(),c=o.getECBytes(),h=l-c,d=function(t,e,r,n,o){for(var i=C(t,e,r,!0),a=new Uint8Array(n),u=0,s=0,f=0,l=0;u<n;){var c=o[s],h=o[s+1];if(s+=2,i>=c*h){for(var d=0;d<h;d++){for(var g=0;g<c;g++)a[u++]=e.get(o[s],o[s+1]),s+=2,f+=8;l+=c*8}}else{for(d=0;d<h;d++){for(g=0;g<c&&u<n;g++)a[u++]=e.get(o[s],o[s+1]),s+=2,f+=8;u>=n&&(l+=8*(u-n+1))}l+=c*8}}if(f!==i)throw new Error("Didn't read all bits ("+f+" != "+i+")");if(u!==n)throw new Error("Didn't read all codewords ("+u+" != "+n+")");return a}(h*8,e,f,h,function(t,e,r){for(var n=t.getTotalCodewords(),o=e.getBlocksForECLevel(),i=[],a=0,u=o;a<u.length;a++){var s=u[a];i.push({numDataCodewords:s.numDataCodewords,codewords:[]})}for(var f=i[0].codewords.length,l=i.length-1;l>=0;){i[l].codewords.length===f&&l--;break}for(var c=f-e.getECBytes(),h=0,d=0;d<c;d++)for(var g=0,v=i;g<v.length;g++){s=v[g];s.codewords.push(r[h++])}for(var p=i.length-1;p>=0;){i[p].codewords.length===f&&p--;break}var w=i[0].codewords.length;for(d=c;d<w;d++)for(var y=0;y<i.length;y++){var m=y<l?d:d+1;i[y].codewords.push(r[h++])}if(h!==n)throw new Error("Didn't read all codewords");for(var x=[],M=0,b=i;M<b.length;M++){x=x.concat((s=b[M]).codewords)}return x}(n,o,t)),g=S.decode(d,n);return g?{text:g.text,bytes:g.bytes,chunks:g.chunks,version:s}:null}function T(t,e){for(var r=0,n=1,o=0,i=1,a=0;a<6;a++){var u=w(t,a,9)+p(t,9,a);u===parseInt("111011111",2)?(r++,n=0):u===parseInt("000100000",2)?(o++,i=0):(0!==n&&n++,0!==i&&i++,n>3&&o>=r||i>3&&r>=o)&&(e^=1<<a)}return e}function U(t){for(var e=t.height,r=Math.floor((e-17)/4),n=r<6?null:[[e-11,e-9],[5,e-9,e-7],[5,9,e-7,e-5],[5,9,13,e-7,e-5,e-3],[5,9,13,17,e-7,e-5,e-3,e-1],[5,9,13,17,21,e-7,e-5,e-3,e-1]][r-1],o=0,i=[],a=function(t){for(var e=5;e<t.height-5;e++)for(var r=5;r<t.width-5;r++)if(0===M(t,e,r)||t.get(r,e)===t.get(r+1,e)===t.get(r+2,e)===t.get(r+3,e)===t.get(r+4,e)===t.get(r+5,e)===t.get(r+6,e)||t.get(r,e)===t.get(r,e+1)===t.get(r,e+2)===t.get(r,e+3)===t.get(r,e+4)===t.get(r,e+5)===t.get(r,e+6))return!1;return!0}(t),u=0;u<e-8;u++)for(var s=0;s<e-8;s++)if((!n||!n.includes(u)||!n.includes(s))&&a||n&&n.includes(u)&&n.includes(s)){var f=M(t,u,s);0===f?(i.push({x:s+2,y:u+2,score:1}),o++):f>0&&(i.push({x:s+2,y:u+2,score:f}),o+=f)}if(o<3)return null;i.sort(function(t,e){return e.score-t.score});for(var l=[],c=0,h=0,d=i;h<d.length;h++){var g=d[h];if(g.score>=1){c++;for(var v=Math.max(0,g.x-5),p=Math.min(t.width-1,g.x+5),w=Math.max(0,g.y-5),y=Math.min(t.height-1,g.y+5),m=v;m<=p;m++)for(var x=w;x<=y;x++)Math.max(Math.abs(g.x-m),Math.abs(g.y-x))<=2&&l.push({x:m,y:x})}if(c>=3)break}if(c<3)return null;for(var b=function(t){for(var e=0,r=t;e<r.length;e++){var n=r[e];t=t.filter(function(t){return t.x!==n.x||t.y!==n.y||n.score<=t.score})}return t.slice(0,3)}(i.filter(function(t){return!l.some(function(e){return e.x===t.x&&e.y===t.y})})),C=0,k=b;C<k.length;C++){g=k[C];for(v=Math.max(0,g.x-8),p=Math.min(t.width-1,g.x+8),w=Math.max(0,g.y-8),y=Math.min(t.height-1,g.y+8),m=v;m<=p;m++)for(x=w;x<=y;x++)Math.max(Math.abs(g.x-m),Math.abs(g.y-x))<=5&&l.push({x:m,y:x})}return l}function N(t,e){for(var r=e.height,n=e.width,o=U(e),i=null,a=1/0,u=0;u<8;u++){e=b.createEmpty(n,r);for(var s=T(t,u),f=0;f<r;f++)for(var l=0;l<n;l++){var c=0===function(t,e,r){switch(t){case 0:return(e+r)%2;case 1:return e%2;case 2:return r%3;case 3:return(e+r)%3;case 4:return(Math.floor(e/2)+Math.floor(r/3))%2;case 5:return e*r%2+e*r%3;case 6:return(e*r%2+e*r%3)%2;case 7:return(e+r)%2+e*r%3%2}}(s,l,f);c!==t.get(l,f)&&e.set(l,f)}var h=o.reduce(function(t,r){return e.get(r.x,r.y)?t+1:t},0);h<a&&(a=h,i={dataMask:s,correctedBits:e})}if(!i)return null;var d=A.decodeFormatInformation(function(t){for(var e=0,r=21522,n=0;n<8;n++)6!==n&&(t.get(n,8)&&(r^=1<<14-n),n<6?t.get(8,n)&&(e^=1<<n):t.get(8,n+1)&&(e^=1<<n+1));for(n=0;n<7;n++)t.get(8,t.height-7+n)&&(e^=1<<14-n),t.get(t.width-8+n,8)&&(r^=1<<n);return r===e?21522^r:null}(i.correctedBits));if(!d)return null;var g=D(t,i.correctedBits,d.getErrorCorrectionLevel());return g?{text:g.text,bytes:g.bytes,chunks:g.chunks,version:g.version,dataMask:i.dataMask,ecLevel:d.getErrorCorrectionLevel()}:null}function j(t,e,r,n){for(var o=n.width,i=t.data,a=new b(n.height,o),u=0;u<n.height;u++)for(var s=0;s<o;s++){var f=4*s+u*o*4;i[f]<128&&a.set(s,u)}return a}return function(t,r,o){void 0===r&&(r={}),void 0===o&&(o={});var i=o.inversionAttempts||"attemptBoth",a=o.greyScaleWeights||{red:.2989,green:.587,blue:.114},u=r.canOverwriteImage||!1,s=r.data,l=r.width,c=r.height;if(s){var h=new Uint8ClampedArray(s.buffer,s.byteOffset,s.length);s=h}for(var d=t,g=d.data,v=d.width,p=d.height,w=v*p*4,y=0;y<w;y++){var m=Math.floor(y/4),x=m%v,M=Math.floor(m/v);y%4==3||(0===s[y]||s&&!u&&s[y]&&x>=l&&x<l+c&&M>=c&&M<c+c||g[y]>255&&(g[y]=255))}var b={binarized:j(t,0,0,t)},C=[];if("attemptBoth"===i||"invertFirst"===i){var k=j(t,0,0,t);k.data=k.data.map(function(t){return t?0:1}),C.push({binarized:k})}if("onlyInvert"===i)return N(t,C[0].binarized);"attemptBoth"!==i&&"dontInvert"!==i||C.push(b);for(var E=0,P=C;E<P.length;E++){var R=P[E].binarized,S=U(R);if(S){var A=function(t){for(var e=t.reduce(function(t,e){return t+e.x},0)/t.length,r=t.reduce(function(t,e){return t+e.y},0)/t.length,n=t.map(function(t){return{x:t.x-e,y:t.y-r}}),o=n.reduce(function(t,e){return t+e.x*e.x},0),i=n.reduce(function(t,e){return t+e.x*e.y},0),a=n.reduce(function(t,e){return t+e.y*e.y},0),u=o-a,s=2*i,f=Math.sqrt(u*u+s*s),l=(u+f)/s,c=Math.atan(l),h=[],d=0,g=n;d<g.length;d++){var v=g[d],p=v.x*Math.cos(c)-v.y*Math.sin(c),w=v.x*Math.sin(c)+v.y*Math.cos(c);h.push({x:p+e,y:w+r})}for(var y=[],m=0,x=h;m<x.length;m++){var M=x[m],b=Math.sqrt(Math.pow(M.x-e,2)+Math.pow(M.y-r,2));y.push(b)}y.sort(function(t,e){return t-e});var C=y[Math.floor(y.length/2)],k=[];for(var E in h){p=h[E].x,w=h[E].y;Math.sqrt(Math.pow(p-e,2)+Math.pow(w-r,2))<1.5*C&&k.push({x:p,y:w})}return{points:k,centroid:{x:e,y:r},averageDistance:C,angle:c}}(S),L=A.points,B=A.centroid,I=A.angle,O=function(t,e,r,o){for(var i=function(t,e){for(var r=e.x-t.x,n=e.y-t.y,o=Math.sqrt(r*r+n*n),i=[],a=0;a<=o;a++){var u=a/o;i.push({x:Math.round(t.x+u*r),y:Math.round(t.y+u*n)})}return i},a=[],u=0,s=r;u<s.length;u++)for(var f=s[u],l=0,c=r;l<c.length;l++){var h=c[l];if(f!==h){var d=i(f,h);n(t,e,f,h,o)>7*o/4&&d.forEach(function(t){return a.push(t)})}}return a}(t,R,L,A.averageDistance),F=[];O.forEach(function(t){F[t.x+t.y*v]=!0});for(var D=O[0],T=O[O.length-1],j=Math.atan2(T.y-D.y,T.x-D.x),z=function(t,e,r,o,a){for(var u=Math.round(Math.sqrt(Math.pow(e.x-t.x,2)+Math.pow(e.y-t.y,2))),s=Math.atan2(o.y-r.y,o.x-r.x),f=[],l=0;l<4;l++){var c=Math.cos(s),h=Math.sin(s),d=a*Math.cos(a<0?s-Math.PI/2:s+Math.PI/2),g=a*Math.sin(a<0?s-Math.PI/2:s+Math.PI/2),v=Math.round(t.x+d),p=Math.round(t.y+g),w=Math.round(e.x+d),y=Math.round(e.y+g),m=Math.round(r.x+d),x=Math.round(r.y+g),M=Math.round(o.x+d),b=Math.round(o.y+g),C=Math.round(v-u*c),k=Math.round(p-u*h),E=Math.round(w+u*c),P=Math.round(y+u*h);f.push({top:{startX:C,startY:k,endX:v,endY:p},bottom:{startX:E,startY:P,endX:w,endY:y},topRight:{x:m,y:x},bottomRight:{x:M,y:b}});var R=i({x:C,y:k},{x:v,y:p},{x:w,y:y},{x:E,y:P});if(n(R,e,{x:(C+E)/2,y:(k+P)/2},{x:(v+w)/2,y:(p+y)/2})>u/4&&n(R,e,{x:(v+m)/2,y:(p+x)/2},{x:(w+M)/2,y:(y+b)/2})>u/4)return f[l]}return null}(D,R,T,{x:T.x+Math.cos(j+Math.PI/2)*A.averageDistance,y:T.y+Math.sin(j+Math.PI/2)*A.averageDistance},Math.cos(I)<0?-A.averageDistance:A.averageDistance),H=a(z.top.startX,z.top.startY,z.bottom.startX,z.bottom.startY,7),W=a(z.top.endX,z.top.endY,z.topRight.x,z.topRight.y,7),q=a(z.bottom.endX,z.bottom.endY,z.bottomRight.x,z.bottomRight.y,7),Z=function(t,e,r,n,o){var i=Math.round(Math.sqrt(Math.pow(e.x-t.x,2)+Math.pow(e.y-t.y,2))/o)*o,a=Math.round(Math.sqrt(Math.pow(n.x-r.x,2)+Math.pow(n.y-r.y,2))/o)*o,u=Math.round(Math.sqrt(Math.pow(r.x-t.x,2)+Math.pow(r.y-t.y,2))/o)*o,s=Math.round(Math.sqrt(Math.pow(n.x-e.x,2)+Math.pow(n.y-e.y,2))/o)*o;return Math.sqrt(i*i+u*u)+Math.sqrt(a*a+s*s)>Math.sqrt((i+a)*(i+a)+(u+s)*(u+s))?{dimension:Math.max(i,a,u,s),moduleSize:o}:{dimension:Math.round(Math.sqrt(Math.pow(Math.max(i,a)+Math.max(u,s),2))/o/2)*o,moduleSize:o}}(H,W,q,z.bottomRight,7)._=Z.dimension,G=Z.moduleSize,J=function(t,e,r,n,o){for(var i=Math.min(r.x,n.x,o.x,e.x),a=Math.min(r.y,n.y,o.y,e.y),u={x:Math.max(r.x,n.x,o.x,e.x)-i,y:Math.max(r.y,n.y,o.y,e.y)-a},s=b.createEmpty(Math.round(u.x),Math.round(u.y)),f=function(t,e,r,n,o,i,a,u){for(var s=a*u,f=[],l=0;l<u;l++)for(var c=0;c<a;c++){var h=c+.5,d=l+.5;f.push({x:(e.x*h+t.x*(a-h)+n.x*(a-h)*d+r.x*h*d)/s,y:(e.y*h+t.y*(a-h)+n.y*(a-h)*d+r.y*h*d)/s})}return f}(r,n,o,e,0,0,_/G,_/G),l=0;l<f.length;l++){var c=f[l],h=Math.floor(c.x-i),d=Math.floor(c.y-a);if(h>=0&&d>=0&&h<u.x&&d<u.y){var g=t.get(Math.floor(c.x),Math.floor(c.y));s.set(h,d,g)}}return{binarized:s,affineTransform:{a11:(n.x-r.x)/_,a21:(n.y-r.y)/_,a31:r.x,a12:(o.x-r.x)/_,a22:(o.y-r.y)/_,a32:r.y},dimension:_,moduleSize:G,topLeft:{x:r.x-i,y:r.y-a},bottomLeft:{x:e.x-i,y:e.y-a},topRight:{x:n.x-i,y:n.y-a},bottomRight:{x:o.x-i,y:o.y-a}}}(R,H,W,q,z.bottomRight),K=J.binarized,Q=J.affineTransform,V=J.dimension,X=J.moduleSize,Y=J.topLeft,$=J.bottomLeft,tt=J.topRight,et=J.bottomRight,rt=h(Y,$,tt,et,X,K);if(rt){var nt=N(t,rt.binarized);if(nt){var ot=nt.text,it=nt.bytes,at=nt.chunks,ut=nt.version,st=nt.dataMask,ft=nt.ecLevel;return{text:ot,bytes:it,chunks:at,version:ut,affineTransform:Q,dataMask:st,ecLevel:ft,binarized:rt.binarized,corners:{topLeft:Y,topRight:tt,bottomRight:et,bottomLeft:$},dimension:V,moduleSize:X}}}}}}});
+    </script>
+
+    <!-- Application Script -->
+    <script>
+        // QR Data Receiver Application
+        class QRDataReceiver {
+            constructor() {
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.stream = null;
+                this.scanInterval = null;
+                this.receivedFrames = new Map();
+                this.totalFrames = 0;
+                this.lastScannedData = null;
+                this.sessionId = null;
+                this.scanCount = 0;
+            }
+
+            initializeElements() {
+                // Media elements
+                this.video = document.getElementById('videoElement');
+                this.videoContainer = document.getElementById('videoContainer');
+                
+                // Control buttons
+                this.startCameraBtn = document.getElementById('startCameraBtn');
+                this.stopCameraBtn = document.getElementById('stopCameraBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.copyBtn = document.getElementById('copyBtn');
+                this.saveToStorageBtn = document.getElementById('saveToStorageBtn');
+                this.clearStorageBtn = document.getElementById('clearStorageBtn');
+                
+                // Display elements
+                this.statusContainer = document.getElementById('statusContainer');
+                this.progressSection = document.getElementById('progressSection');
+                this.progressFill = document.getElementById('progressFill');
+                this.progressText = document.getElementById('progressText');
+                this.resultsSection = document.getElementById('resultsSection');
+                this.receivedData = document.getElementById('receivedData');
+                this.storedDataSection = document.getElementById('storedDataSection');
+                this.storedSessions = document.getElementById('storedSessions');
+            }
+
+            initializeEventListeners() {
+                this.startCameraBtn.addEventListener('click', () => this.startCamera());
+                this.stopCameraBtn.addEventListener('click', () => this.stopCamera());
+                this.resetBtn.addEventListener('click', () => this.resetSession());
+                this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+                this.saveToStorageBtn.addEventListener('click', () => this.saveToStorage());
+                this.clearStorageBtn.addEventListener('click', () => this.clearAllStorage());
+
+                // Load existing stored data on startup
+                this.loadStoredSessions();
+            }
+
+            async startCamera() {
+                try {
+                    this.showStatus('正在请求摄像头权限...', 'info');
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment', // Prefer rear camera
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+
+                    this.video.srcObject = this.stream;
+                    this.video.play();
+
+                    // Start scanning after video is ready
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.startScanning();
+                    });
+
+                    this.startCameraBtn.disabled = true;
+                    this.stopCameraBtn.disabled = false;
+                    this.progressSection.style.display = 'block';
+
+                    this.showStatus('摄像头已启动，请将摄像头对准二维码', 'info');
+
+                } catch (error) {
+                    console.error('Camera access error:', error);
+                    this.showStatus('摄像头访问失败: ' + error.message, 'error');
+                    
+                    // Provide fallback instructions
+                    this.showStatus('请确保使用HTTPS并授予摄像头权限', 'warning');
+                }
+            }
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+
+                if (this.scanInterval) {
+                    clearInterval(this.scanInterval);
+                    this.scanInterval = null;
+                }
+
+                this.video.srcObject = null;
+                this.startCameraBtn.disabled = false;
+                this.stopCameraBtn.disabled = true;
+
+                this.showStatus('摄像头已停止', 'info');
+            }
+
+            startScanning() {
+                // Scan every 100ms for responsive detection
+                this.scanInterval = setInterval(() => {
+                    this.scanFrame();
+                }, 100);
+
+                this.showStatus('正在扫描二维码...', 'info');
+            }
+
+            scanFrame() {
+                if (!this.video.videoWidth || !this.video.videoHeight) {
+                    return;
+                }
+
+                // Create canvas for frame capture
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                canvas.width = this.video.videoWidth;
+                canvas.height = this.video.videoHeight;
+                
+                // Draw current frame
+                context.drawImage(this.video, 0, 0);
+                
+                // Get image data for QR scanning
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Scan for QR code
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    this.processQRCode(code.data);
+                }
+            }
+
+            processQRCode(qrData) {
+                // Prevent processing same QR code multiple times rapidly
+                if (qrData === this.lastScannedData) {
+                    return;
+                }
+
+                this.lastScannedData = qrData;
+                this.scanCount++;
+
+                try {
+                    // For Phase 1: Simple text processing (no frame protocol yet)
+                    this.showStatus(`检测到二维码 (第${this.scanCount}次扫描)`, 'info');
+                    
+                    // Display the received text
+                    this.receivedData.value = qrData;
+                    this.resultsSection.style.display = 'block';
+                    
+                    // Update progress to show completion
+                    this.progressFill.style.width = '100%';
+                    this.progressText.textContent = '传输完成！';
+                    
+                    // Flash success
+                    this.video.style.filter = 'brightness(1.2)';
+                    setTimeout(() => {
+                        this.video.style.filter = 'none';
+                    }, 200);
+                    
+                    this.showStatus('数据接收成功！', 'info');
+
+                    // Auto-save to localStorage
+                    this.autoSaveData(qrData);
+
+                } catch (error) {
+                    console.error('QR processing error:', error);
+                    this.showStatus('处理二维码错误: ' + error.message, 'error');
+                }
+
+                // Clear the last scanned data after a delay to allow re-scanning
+                setTimeout(() => {
+                    this.lastScannedData = null;
+                }, 1000);
+            }
+
+            autoSaveData(data) {
+                const sessionId = 'session_' + Date.now();
+                const sessionData = {
+                    id: sessionId,
+                    timestamp: new Date().toISOString(),
+                    type: 'text',
+                    data: data,
+                    size: data.length
+                };
+
+                localStorage.setItem(sessionId, JSON.stringify(sessionData));
+                this.loadStoredSessions();
+                
+                this.showStatus('数据已自动保存到本地存储', 'info');
+            }
+
+            resetSession() {
+                this.receivedFrames.clear();
+                this.totalFrames = 0;
+                this.sessionId = null;
+                this.lastScannedData = null;
+                this.scanCount = 0;
+                
+                this.receivedData.value = '';
+                this.resultsSection.style.display = 'none';
+                
+                this.progressFill.style.width = '0%';
+                this.progressText.textContent = '等待二维码...';
+                
+                this.showStatus('会话已重置，准备接收新数据', 'info');
+            }
+
+            async copyToClipboard() {
+                try {
+                    await navigator.clipboard.writeText(this.receivedData.value);
+                    this.showStatus('数据已复制到剪贴板！', 'info');
+                } catch (error) {
+                    // Fallback for older browsers
+                    this.receivedData.select();
+                    document.execCommand('copy');
+                    this.showStatus('数据已复制到剪贴板！', 'info');
+                }
+            }
+
+            saveToStorage() {
+                if (!this.receivedData.value) {
+                    this.showStatus('没有数据可保存', 'warning');
+                    return;
+                }
+
+                const sessionId = 'manual_' + Date.now();
+                const sessionData = {
+                    id: sessionId,
+                    timestamp: new Date().toISOString(),
+                    type: 'text',
+                    data: this.receivedData.value,
+                    size: this.receivedData.value.length,
+                    manual: true
+                };
+
+                localStorage.setItem(sessionId, JSON.stringify(sessionData));
+                this.loadStoredSessions();
+                
+                this.showStatus('数据已保存到本地存储', 'info');
+            }
+
+            loadStoredSessions() {
+                const sessions = [];
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('session_') || key.startsWith('manual_')) {
+                        try {
+                            const data = JSON.parse(localStorage.getItem(key));
+                            sessions.push(data);
+                        } catch (error) {
+                            console.warn('Invalid session data:', key);
+                        }
+                    }
+                }
+
+                if (sessions.length > 0) {
+                    this.storedDataSection.style.display = 'block';
+                    this.displayStoredSessions(sessions.sort((a, b) => 
+                        new Date(b.timestamp) - new Date(a.timestamp)
+                    ));
+                } else {
+                    this.storedDataSection.style.display = 'none';
+                }
+            }
+
+            displayStoredSessions(sessions) {
+                this.storedSessions.innerHTML = sessions.map(session => `
+                    <div class="frame-item">
+                        <div>
+                            <div class="frame-number">${session.id}</div>
+                            <small>${new Date(session.timestamp).toLocaleString()}</small>
+                        </div>
+                        <div>
+                            <span class="frame-status received">${session.size} 字符</span>
+                            <button class="btn" style="margin-left: 10px; padding: 5px 10px; font-size: 0.8rem;" 
+                                    onclick="window.qrReceiver.loadSession('${session.id}')">加载</button>
+                            <button class="btn btn-danger" style="margin-left: 5px; padding: 5px 10px; font-size: 0.8rem;"
+                                    onclick="window.qrReceiver.deleteSession('${session.id}')">删除</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            loadSession(sessionId) {
+                try {
+                    const sessionData = JSON.parse(localStorage.getItem(sessionId));
+                    if (sessionData) {
+                        this.receivedData.value = sessionData.data;
+                        this.resultsSection.style.display = 'block';
+                        this.showStatus('会话已加载: ' + sessionId, 'info');
+                    }
+                } catch (error) {
+                    this.showStatus('加载会话错误: ' + error.message, 'error');
+                }
+            }
+
+            deleteSession(sessionId) {
+                if (confirm('删除此会话？')) {
+                    localStorage.removeItem(sessionId);
+                    this.loadStoredSessions();
+                    this.showStatus('会话已删除', 'info');
+                }
+            }
+
+            clearAllStorage() {
+                if (confirm('清除所有存储的数据？此操作不可撤销。')) {
+                    const keys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith('session_') || key.startsWith('manual_')) {
+                            keys.push(key);
+                        }
+                    }
+                    
+                    keys.forEach(key => localStorage.removeItem(key));
+                    this.loadStoredSessions();
+                    this.showStatus('所有存储的数据已清除', 'info');
+                }
+            }
+
+            showStatus(message, type = 'info') {
+                this.statusContainer.innerHTML = `<div class="status ${type}">${message}</div>`;
+                
+                // Auto-hide non-error messages after 5 seconds
+                if (type !== 'error') {
+                    setTimeout(() => {
+                        if (this.statusContainer.innerHTML.includes(message)) {
+                            this.statusContainer.innerHTML = '<div class="status info">准备扫描</div>';
+                        }
+                    }, 5000);
+                }
+            }
+        }
+
+        // Initialize application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.qrReceiver = new QRDataReceiver();
+        });
+    </script>
+</body>
+</html>
