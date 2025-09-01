@@ -3,11 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QR工具集</title>
+<title>QR数据传输系统</title>
+<!-- PWA支持 -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#4CAF50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="QR传输">
+<link rel="apple-touch-icon" href="/icons/icon-152x152.png">
 <style>
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    max-width: 600px;
+    max-width: 800px;
     margin: 50px auto;
     padding: 20px;
     background: #f5f5f5;
@@ -15,12 +22,17 @@ body {
 h1 {
     color: #333;
     text-align: center;
+    margin-bottom: 10px;
+}
+.subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 40px;
 }
 .tools {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    margin-top: 40px;
 }
 .tool-card {
     background: white;
@@ -54,23 +66,77 @@ h1 {
     font-size: 12px;
     margin-left: 10px;
 }
+.badge-mobile {
+    background: #2196F3;
+}
+.badge-test {
+    background: #FF9800;
+}
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+    color: #999;
+    font-size: 14px;
+}
 </style>
 </head>
 <body>
-<h1>🔧 QR 工具集</h1>
+<h1>🔐 QR数据传输系统</h1>
+<p class="subtitle">通过二维码实现跨网络的安全数据传输</p>
+
 <div class="tools">
-    <a href="qr-generator.html" class="tool-card">
-        <h2>📝 二维码生成器</h2>
-        <p>将文本转换为易扫描的二维码，支持密度调节和自动分片。默认使用最佳扫描设置。</p>
+    <a href="sender.html" class="tool-card">
+        <h2>📤 发送端</h2>
+        <p>将文本数据转换为二维码进行传输。适用于内网环境，完全离线运行，支持大文本自动分片。</p>
+        <span class="badge">离线可用</span>
     </a>
-    <a href="qr-tool.html" class="tool-card">
-        <h2>📱 二维码扫描与解析 <span class="badge">全功能</span></h2>
-        <p>支持摄像头实时扫描和图片上传解析。自动识别分片二维码并合并，适用于手机和电脑。</p>
+    
+    <a href="receiver.html" class="tool-card">
+        <h2>📥 接收端</h2>
+        <p>扫描二维码接收数据。支持移动设备，可自动拼接多片数据，具备错误恢复机制。</p>
+        <span class="badge badge-mobile">移动优化</span>
     </a>
-    <a href="qr-scanner-enhanced.html" class="tool-card">
-        <h2>🚀 增强版扫描器 <span class="badge" style="background:#ff5722;">WASM优先</span></h2>
-        <p>采用WASM解码器(zxing-cpp)，识别率更高。支持局部自适应阈值、实时FPS显示、分片进度可视化。</p>
+    
+    <a href="test.html" class="tool-card">
+        <h2>🧪 系统测试</h2>
+        <p>运行完整的测试套件，包括核心功能、边界条件、性能和兼容性测试，确保系统稳定可靠。</p>
+        <span class="badge badge-test">基础测试</span>
+    </a>
+    
+    <a href="test-advanced.html" class="tool-card">
+        <h2>🚀 高级测试</h2>
+        <p>深度测试系统在极端条件下的表现，包括网络异常、高并发、存储限制、设备兼容性等场景。</p>
+        <span class="badge badge-test">高级测试</span>
     </a>
 </div>
+
+<div class="footer">
+    <p>© 2024 QR数据传输系统 | <a href="https://github.com/ttieli/Scan" style="color: #666;">GitHub</a></p>
+</div>
+
+<script>
+// PWA Service Worker 注册
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                console.log('ServiceWorker registration successful:', registration.scope);
+            })
+            .catch(err => {
+                console.log('ServiceWorker registration failed:', err);
+            });
+    });
+}
+
+// PWA安装提示
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('PWA可以安装');
+});
+</script>
 </body>
 </html>

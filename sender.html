@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR数据发送器 - 内网数据传输</title>
     <meta name="description" content="通过二维码安全传输内网数据到外部设备">
+    <!-- PWA支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     
     <style>
         /* QR Data Transfer System - Sender Styles */
@@ -413,12 +417,34 @@
                     return;
                 }
 
+                // 数据验证
+                if (text.length > 10000) {
+                    this.showStatus('数据过大，请减少文本长度', 'error');
+                    return;
+                }
+
                 try {
                     this.showStatus('正在生成二维码...', 'info');
                     
-                    // Phase 1: Simple single QR code (no chunking yet)
-                    this.frames = [text]; // Single frame for now
-                    this.displayQRCode(text, 0);
+                    // 添加错误恢复机制
+                    let retryCount = 0;
+                    const maxRetries = 3;
+                    let success = false;
+                    
+                    while (retryCount < maxRetries && !success) {
+                        try {
+                            // Phase 1: Simple single QR code (no chunking yet)
+                            this.frames = [text]; // Single frame for now
+                            this.displayQRCode(text, 0);
+                            success = true;
+                        } catch (innerError) {
+                            retryCount++;
+                            console.warn(`QR生成重试 ${retryCount}/${maxRetries}:`, innerError);
+                            if (retryCount >= maxRetries) {
+                                throw innerError;
+                            }
+                        }
+                    }
                     
                     // Enable playback controls
                     this.playBtn.disabled = false;
@@ -430,6 +456,9 @@
                 } catch (error) {
                     console.error('QR Generation Error:', error);
                     this.showStatus('生成二维码错误: ' + error.message, 'error');
+                    // 清理状态
+                    this.qrDisplay.innerHTML = '';
+                    this.frames = [];
                 }
             }
 
