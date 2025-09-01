@@ -11,7 +11,16 @@
     "test:e2e": "playwright test",
     "test:security": "jest tests/security",
     "test:performance": "jest tests/performance",
-    "test:all": "npm run test:unit && npm run test:integration && npm run test:security && npm run test:performance && npm run test:e2e"
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:security && npm run test:performance && npm run test:e2e",
+    "test:segmented": "node tests/run-segmented-tests.js",
+    "test:segmented:phase1": "node tests/run-segmented-tests.js phase1",
+    "test:segmented:phase2": "node tests/run-segmented-tests.js phase2",
+    "test:segmented:phase3": "node tests/run-segmented-tests.js phase3",
+    "test:segmented:phase4": "node tests/run-segmented-tests.js phase4",
+    "test:segmented:dry": "node tests/run-segmented-tests.js phase1 --dry-run",
+    "test:segmented:verbose": "node tests/run-segmented-tests.js phase1 --verbose",
+    "test:segmented:report": "node tests/run-segmented-tests.js phase1 --report",
+    "test:core": "jest tests/core/segmented-qr.test.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
