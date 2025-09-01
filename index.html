@@ -117,11 +117,12 @@ h1 {
     <p>© 2024 QR数据传输系统 | <a href="https://github.com/ttieli/Scan" style="color: #666;">GitHub</a></p>
 </div>
 
+<script src="config.js"></script>
 <script>
 // PWA Service Worker 注册
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('service-worker.js')
+        navigator.serviceWorker.register(config.serviceWorkerPath)
             .then(registration => {
                 console.log('ServiceWorker registration successful:', registration.scope);
             })

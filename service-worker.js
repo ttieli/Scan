@@ -1,17 +1,24 @@
 // Service Worker for QR Data Transfer System
 // Version: 1.0.0
 
-const CACHE_NAME = 'qr-transfer-v1';
+const CACHE_NAME = 'qr-transfer-v1.1';
+
+// 检测是否在GitHub Pages上运行
+const isGitHubPages = self.location.hostname === 'ttieli.github.io';
+const basePath = isGitHubPages ? '/Scan' : '';
+
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/sender.html',
-  '/receiver.html',
-  '/test.html',
-  '/test-advanced.html',
-  '/manifest.json',
+  basePath + '/',
+  basePath + '/index.html',
+  basePath + '/sender.html',
+  basePath + '/receiver.html',
+  basePath + '/test.html',
+  basePath + '/test-advanced.html',
+  basePath + '/manifest.json',
+  basePath + '/config.js',
   'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js',
-  'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
+  'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'
 ];
 
 // 安装事件 - 缓存资源
