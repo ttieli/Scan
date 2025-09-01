@@ -1,14 +1,11 @@
 # QR数据传输系统 / QR Data Transfer System
 
-通过动态二维码实现内网到外网的安全数据传输。一个简单实用的二维码生成和扫描工具集。
+通过动态二维码实现跨网络的安全数据传输。一个简单实用的二维码生成和扫描工具集。
 
-## 项目状态 (Project Status)
+## 🚀 在线体验
 
-✅ **Phase 1 完成**: 核心QR逻辑测试 - 49个测试全部通过
-- QR生成测试: 8个测试
-- QR解析测试: 16个测试  
-- 数据重组测试: 9个测试
-- 性能验证: 8个测试 (全部 <10ms)
+- **接收端**: https://ttieli.github.io/Scan/receiver.html
+- **主页**: https://ttieli.github.io/Scan/
 
 ## 系统特点
 
@@ -51,17 +48,10 @@
 3. 将摄像头对准屏幕上的二维码
 4. 数据自动接收并保存
 
-### 本地开发
+### 本地使用
 ```bash
 # 克隆仓库
 git clone https://github.com/ttieli/Scan.git
-
-# 安装依赖
-npm install
-
-# 运行测试
-npm run test:segmented:phase1  # 运行核心逻辑测试
-npm run test:all               # 运行所有测试
 
 # 使用HTTP服务器运行
 python -m http.server 8000
@@ -73,33 +63,17 @@ npx serve
 - 纯 HTML/CSS/JavaScript
 - jsQR 库用于二维码扫描
 - qrcode.js 用于二维码生成
-- Jest 测试框架
-- Playwright E2E测试
-- 无需任何构建工具
-
-## 测试覆盖率
-
-当前测试覆盖:
-- ✅ 核心QR逻辑 (100%)
-- ✅ 数据分块算法 (100%)
-- ✅ 错误处理 (100%)
-- ⏳ 浏览器API集成 (计划中)
-- ⏳ E2E用户流程 (计划中)
+- 无需任何构建工具或框架
 
 ## 文件结构
 
 ```
-QR_Group_Scan/
-├── sender.html         # 内网发送端（完全离线）
-├── receiver.html       # 外网接收端（GitHub Pages托管）
-├── groupscan.md       # 技术文档
-├── package.json       # 项目配置
-├── tests/            
-│   ├── core/         # 核心逻辑测试（Phase 1完成）
-│   ├── unit/         # 单元测试
-│   ├── integration/  # 集成测试
-│   └── e2e/         # 端到端测试
-└── TESTING.md        # 测试策略文档
+Scan/
+├── index.html         # 项目主页
+├── sender.html        # 发送端（完全离线）
+├── receiver.html      # 接收端（支持在线托管）
+├── README.md          # 项目说明
+└── package.json       # 项目配置
 ```
 
 ## 浏览器兼容性
@@ -115,12 +89,12 @@ QR_Group_Scan/
 3. 选择main分支作为源
 4. 访问 `https://[你的用户名].github.io/Scan/`
 
-## 开发计划
+## 应用场景
 
-- [x] Phase 1: 核心逻辑测试（完成）
-- [ ] Phase 2: 浏览器API集成测试
-- [ ] Phase 3: 文件传输支持
-- [ ] Phase 4: 生产环境优化
+- 📱 跨设备文本传输
+- 🔒 物理隔离网络间的数据传递
+- 📋 临时数据分享
+- 🚀 无需安装APP的快速传输
 
 ## License
 
