@@ -341,34 +341,20 @@
     <!-- Configuration -->
     <script src="config.js"></script>
     
-    <!-- QRCode.js Library (embedded for offline use) -->
+    <!-- Resource Loader -->
+    <script src="js/resource-loader.js"></script>
+    
+    <!-- Load QRCode.js -->
     <script>
-        // QRCode.js v1.5.3 - Minimal embedded version for offline use
-        // Full library: https://github.com/davidshimjs/qrcodejs
-        // Load QRCode.js from CDN
-        window.qrcodeLoaded = false;
-        (function() {
-            var script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-            script.onload = function() {
-                console.log('QRCode.js loaded successfully');
-                window.qrcodeLoaded = true;
-                // Trigger a custom event to notify the app
+        // Load QRCode library with fallback support
+        (async function() {
+            try {
+                await window.resourceLoader.loadResource('qrcode');
+                console.log('QRCode library loaded successfully');
                 window.dispatchEvent(new Event('qrcode-loaded'));
-            };
-            script.onerror = function() {
-                console.error('Failed to load QRCode.js from CDN, using fallback');
-                // Fallback to another CDN
-                var fallbackScript = document.createElement('script');
-                fallbackScript.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-                fallbackScript.onload = function() {
-                    console.log('QRCode.js loaded from fallback CDN');
-                    window.qrcodeLoaded = true;
-                    window.dispatchEvent(new Event('qrcode-loaded'));
-                };
-                document.head.appendChild(fallbackScript);
-            };
-            document.head.appendChild(script);
+            } catch (error) {
+                console.error('Failed to load QRCode library:', error);
+            }
         })();
     </script>
 
@@ -494,7 +480,7 @@
             displayQRCode(data, frameIndex = 0) {
                 try {
                     // Check if QRCode library is loaded
-                    if (!window.qrcodeLoaded || typeof QRCode === 'undefined') {
+                    if (typeof QRCode === 'undefined') {
                         console.log('Waiting for QRCode library to load...');
                         // Wait for library to load then retry
                         window.addEventListener('qrcode-loaded', () => {

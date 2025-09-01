@@ -16,6 +16,10 @@ const urlsToCache = [
   basePath + '/test-advanced.html',
   basePath + '/manifest.json',
   basePath + '/config.js',
+  basePath + '/js/resource-loader.js',
+  basePath + '/libs/qrcode.min.js',
+  basePath + '/libs/jsQR.js',
+  // CDN fallbacks
   'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'

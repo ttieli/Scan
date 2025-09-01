@@ -12,9 +12,11 @@
 - 🔒 **物理隔离**: 内网与外网完全隔离，数据通过二维码视觉传输
 - 📱 **无需安装**: 纯HTML/JavaScript实现，浏览器直接运行
 - 🚀 **简单易用**: 内网生成二维码，外网扫描接收
-- 💾 **离线运行**: sender.html完全离线，所有代码内嵌
+- 💾 **离线运行**: 支持完全离线使用，内置所有依赖库
 - 🔄 **多片支持**: 支持长文本自动分片和自动合并
 - ✅ **测试驱动**: 完整的测试套件确保可靠性
+- 📲 **PWA支持**: 可安装为应用，支持离线使用
+- 🌐 **双环境支持**: 同时支持纯内网部署和GitHub Pages托管
 
 ## 功能特性
 
@@ -69,11 +71,21 @@ npx serve
 
 ```
 Scan/
-├── index.html         # 项目主页
-├── sender.html        # 发送端（完全离线）
-├── receiver.html      # 接收端（支持在线托管）
-├── README.md          # 项目说明
-└── package.json       # 项目配置
+├── index.html           # 项目主页
+├── sender.html          # 发送端（支持离线）
+├── receiver.html        # 接收端（支持离线）
+├── manifest.json        # PWA配置
+├── service-worker.js    # Service Worker缓存策略
+├── config.js           # 环境检测配置
+├── js/
+│   └── resource-loader.js  # 资源加载器
+├── libs/
+│   ├── qrcode.min.js   # QR码生成库（本地）
+│   └── jsQR.js         # QR码扫描库（本地）
+├── public/icons/       # PWA图标
+├── tests/              # 测试文件
+├── README.md           # 项目说明
+└── package.json        # 项目配置
 ```
 
 ## 浏览器兼容性
