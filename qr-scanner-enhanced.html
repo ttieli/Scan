@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>增强版二维码扫描器（WASM优先）</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { 
+    margin:0; 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans SC', sans-serif; 
+    background: #f5f5f5;
+  }
+  .app { 
+    max-width: 680px; 
+    margin: 0 auto; 
+    padding: 16px; 
+    background: white;
+    min-height: 100vh;
+  }
+  h2 { 
+    color: #333; 
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .video-wrap { 
+    position: relative; 
+    border-radius: 16px; 
+    overflow: hidden; 
+    background:#000; 
+    margin: 20px 0;
+  }
+  video { 
+    width: 100%; 
+    height: auto; 
+    display:block; 
+  }
+  canvas.overlay { 
+    position:absolute; 
+    inset:0; 
+    pointer-events:none; 
+  }
+  .controls { 
+    display:flex; 
+    gap:8px; 
+    align-items:center; 
+    flex-wrap:wrap; 
+    margin:12px 0; 
+  }
+  .controls > * { flex: none; }
+  .badge { 
+    padding:4px 10px; 
+    border-radius: 999px; 
+    font-size:12px; 
+    background:#4CAF50; 
+    color: white;
+    font-weight: 500;
+  }
+  .badge.warning { background: #ff9800; }
+  .row { 
+    display:flex; 
+    align-items:center; 
+    gap:8px; 
+    margin-top:8px; 
+  }
+  .result { 
+    margin-top:20px; 
+    padding:16px; 
+    border-radius:12px; 
+    background:#f0f7ff; 
+    word-break:break-all; 
+    border: 1px solid #d0e5ff;
+    min-height: 60px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  }
+  .result.success {
+    background: #e8f5e9;
+    border-color: #a5d6a7;
+  }
+  button { 
+    padding:10px 16px; 
+    border-radius:10px; 
+    border:1px solid rgba(0,0,0,.12); 
+    background:#fff; 
+    cursor:pointer; 
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  button:hover:not(:disabled) {
+    background: #f5f5f5;
+    transform: translateY(-1px);
+  }
+  button:disabled{ 
+    opacity:.5; 
+    cursor:not-allowed; 
+  }
+  button.primary {
+    background: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+  }
+  button.primary:hover:not(:disabled) {
+    background: #45a049;
+  }
+  .hint { 
+    font-size:13px; 
+    opacity:.7; 
+    margin-top:12px; 
+    line-height: 1.5;
+  }
+  .grid {
+    position:absolute; 
+    inset:0; 
+    pointer-events:none;
+    box-shadow: inset 0 0 0 100vmax rgba(0,0,0,.35);
+  }
+  .guide {
+    position:absolute; 
+    inset:0; 
+    display:flex; 
+    align-items:center; 
+    justify-content:center;
+  }
+  .box {
+    width: 68%; 
+    aspect-ratio:1/1; 
+    max-width: 440px; 
+    border:2px solid rgba(255,255,255,.9); 
+    border-radius:12px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.6; }
+  }
+  .toast { 
+    position:fixed; 
+    left:50%; 
+    transform:translateX(-50%); 
+    bottom:20px; 
+    background:rgba(0,0,0,.8); 
+    color:#fff; 
+    padding:10px 16px; 
+    border-radius:999px; 
+    font-size:13px; 
+    display:none; 
+    z-index: 1000;
+  }
+  .fragments-container {
+    margin-top: 20px;
+    padding: 16px;
+    background: #fffbf0;
+    border: 1px solid #ffd599;
+    border-radius: 12px;
+    display: none;
+  }
+  .fragments-container.active { display: block; }
+  .fragments-header {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #e65100;
+  }
+  .fragment-item {
+    padding: 8px;
+    margin: 4px 0;
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .fragment-status {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: #4CAF50;
+    color: white;
+  }
+  .stats {
+    display: flex;
+    gap: 16px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: #666;
+  }
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .stat-value {
+    font-weight: 600;
+    color: #333;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h2>🚀 增强版二维码扫描器</h2>
+
+  <div class="controls">
+    <button id="btnStart" class="primary">开始扫码</button>
+    <button id="btnStop" disabled>停止</button>
+    <button id="btnTorch" disabled>手电</button>
+    <button id="btnUpload">上传图片</button>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    <span id="decoderTag" class="badge">未初始化</span>
+  </div>
+
+  <div class="controls">
+    <label class="row">
+      缩放
+      <input id="zoomRange" type="range" min="1" max="3" step="0.1" value="1" />
+      <span id="zoomVal" class="badge">1.0×</span>
+    </label>
+  </div>
+
+  <div class="stats">
+    <div class="stat-item">
+      FPS: <span id="fps" class="stat-value">0</span>
+    </div>
+    <div class="stat-item">
+      扫描次数: <span id="scanCount" class="stat-value">0</span>
+    </div>
+    <div class="stat-item">
+      成功率: <span id="successRate" class="stat-value">0%</span>
+    </div>
+  </div>
+
+  <div class="video-wrap" id="videoWrap" style="display:none;">
+    <video id="video" playsinline></video>
+    <canvas id="overlay" class="overlay"></canvas>
+    <!-- 遮罩 + 取景框 -->
+    <div class="grid"></div>
+    <div class="guide"><div class="box"></div></div>
+  </div>
+
+  <div class="result" id="result">准备就绪，点击"开始扫码"或上传图片</div>
+  
+  <div class="fragments-container" id="fragmentsContainer">
+    <div class="fragments-header">🧩 分片识别进度</div>
+    <div id="fragmentsList"></div>
+  </div>
+
+  <div class="hint">
+    💡 提示：
+    <br>• 把二维码置于白框中间，占画面 30-60%
+    <br>• 使用WASM解码器，识别率更高
+    <br>• 支持分片二维码自动合并
+    <br>• 所有处理均在本地完成，不上传数据
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- 解码库：WASM（zxing-cpp）优先，失败时降级 jsQR -->
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+
+<script>
+/** ================== 基本元素与状态 ================== */
+const $ = s => document.querySelector(s);
+const video = $('#video');
+const videoWrap = $('#videoWrap');
+const overlay = $('#overlay');
+const octx = overlay.getContext('2d');
+const btnStart = $('#btnStart');
+const btnStop = $('#btnStop');
+const btnTorch = $('#btnTorch');
+const btnUpload = $('#btnUpload');
+const fileInput = $('#fileInput');
+const zoomRange = $('#zoomRange');
+const zoomVal = $('#zoomVal');
+const decoderTag = $('#decoderTag');
+const resultEl = $('#result');
+const toastEl = $('#toast');
+const fragmentsContainer = $('#fragmentsContainer');
+const fragmentsList = $('#fragmentsList');
+const fpsEl = $('#fps');
+const scanCountEl = $('#scanCount');
+const successRateEl = $('#successRate');
+
+let stream = null;
+let track = null;
+let running = false;
+let busy = false;
+let useWorker = null; // WASM worker
+let lastOkTime = 0;
+let failCount = 0;
+let torchOn = false;
+let scanStats = { total: 0, success: 0 };
+let fpsCounter = { frames: 0, lastTime: performance.now() };
+
+// 分片管理
+const fragments = new Map();
+let currentBatch = null;
+
+const ROI = { x:0.16, y:0.16, w:0.68, h:0.68 }; // 取景框与处理区域
+const FRAME_DECODE_EVERY = 1;  // 每帧都解码，提高识别率
+let frameCounter = 0;
+
+/** ================== 工具函数 ================== */
+function toast(msg, ms=2000){ 
+  toastEl.textContent=msg; 
+  toastEl.style.display='block'; 
+  setTimeout(()=>toastEl.style.display='none', ms); 
+}
+
+function setDecoderTag(t, isWarning=false){ 
+  decoderTag.textContent = t;
+  decoderTag.className = isWarning ? 'badge warning' : 'badge';
+}
+
+function updateStats(){
+  // FPS计算
+  const now = performance.now();
+  const elapsed = now - fpsCounter.lastTime;
+  if (elapsed >= 1000){
+    fpsEl.textContent = Math.round(fpsCounter.frames * 1000 / elapsed);
+    fpsCounter.frames = 0;
+    fpsCounter.lastTime = now;
+  }
+  
+  // 成功率
+  if (scanStats.total > 0){
+    const rate = (scanStats.success / scanStats.total * 100).toFixed(1);
+    successRateEl.textContent = rate + '%';
+  }
+  scanCountEl.textContent = scanStats.total;
+}
+
+/** ================== 分片处理 ================== */
+function parseFragment(text){
+  // 支持多种格式
+  // 新格式: [片段1/3:batch]\n内容
+  const doubleEncodingMatch = text.match(/^\[片段(\d+)\/(\d+):([a-z0-9]+)\]\n([\s\S]*)/);
+  if (doubleEncodingMatch){
+    return {
+      index: parseInt(doubleEncodingMatch[1]),
+      total: parseInt(doubleEncodingMatch[2]),
+      batchId: doubleEncodingMatch[3],
+      content: doubleEncodingMatch[4],
+      isFragment: true
+    };
+  }
+  
+  // 旧格式兼容
+  const oldMatch = text.match(/^\[(\d+)\/(\d+):([^:\]]+):([BED])\](.+)/);
+  if (oldMatch){
+    const content = oldMatch[4] === 'B' ? atob(oldMatch[5]) : oldMatch[5];
+    return {
+      index: parseInt(oldMatch[1]),
+      total: parseInt(oldMatch[2]),
+      batchId: oldMatch[3],
+      content: content,
+      isFragment: true
+    };
+  }
+  
+  return { isFragment: false, content: text };
+}
+
+function updateFragmentsUI(){
+  if (!currentBatch || fragments.size === 0){
+    fragmentsContainer.classList.remove('active');
+    return;
+  }
+  
+  fragmentsContainer.classList.add('active');
+  fragmentsList.innerHTML = '';
+  
+  const batch = fragments.get(currentBatch);
+  if (!batch) return;
+  
+  // 添加进度条
+  const progressBar = document.createElement('div');
+  progressBar.style.cssText = 'width:100%; height:20px; background:#e0e0e0; border-radius:10px; margin-bottom:12px; overflow:hidden;';
+  const progressFill = document.createElement('div');
+  const progress = (batch.pieces.size / batch.total) * 100;
+  progressFill.style.cssText = `width:${progress}%; height:100%; background:#4CAF50; transition:width 0.3s;`;
+  progressBar.appendChild(progressFill);
+  
+  const progressText = document.createElement('div');
+  progressText.style.cssText = 'text-align:center; margin-bottom:12px; font-weight:600;';
+  progressText.textContent = `进度: ${batch.pieces.size}/${batch.total} (${Math.round(progress)}%)`;
+  
+  fragmentsList.appendChild(progressText);
+  fragmentsList.appendChild(progressBar);
+  
+  // 显示每个片段状态
+  const gridContainer = document.createElement('div');
+  gridContainer.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fill, minmax(60px, 1fr)); gap:8px; margin-top:12px;';
+  
+  for (let i = 1; i <= batch.total; i++){
+    const item = document.createElement('div');
+    const hasFragment = batch.pieces.has(i);
+    item.style.cssText = `
+      padding:8px; text-align:center; border-radius:8px;
+      background:${hasFragment ? '#4CAF50' : '#f5f5f5'};
+      color:${hasFragment ? 'white' : '#999'};
+      font-weight:600; font-size:14px;
+      border:2px solid ${hasFragment ? '#4CAF50' : '#ddd'};
+      ${batch.lastScanned === i ? 'animation: pulse 0.5s;' : ''}
+    `;
+    item.textContent = i;
+    gridContainer.appendChild(item);
+  }
+  
+  fragmentsList.appendChild(gridContainer);
+  
+  // 检查是否完整
+  if (batch.pieces.size === batch.total){
+    const sortedTexts = [];
+    for (let i = 1; i <= batch.total; i++){
+      if (batch.pieces.has(i)){
+        sortedTexts.push(batch.pieces.get(i));
+      }
+    }
+    const fullText = sortedTexts.join('');
+    onDecodeSuccess(fullText, true);
+    fragments.clear();
+    currentBatch = null;
+    setTimeout(()=> fragmentsContainer.classList.remove('active'), 5000);
+  }
+}
+
+/** ================== 相机控制 ================== */
+async function startCamera(){
+  const constraints = {
+    audio:false,
+    video:{
+      facingMode:{ ideal: 'environment' },
+      width:{ ideal:1920 },
+      height:{ ideal:1080 },
+      frameRate:{ ideal:30, max:30 },
+      advanced:[ { focusMode:'continuous' } ]
+    }
+  };
+  
+  try {
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await video.play();
+    track = stream.getVideoTracks()[0];
+    videoWrap.style.display = 'block';
+    
+    // 缩放能力检测
+    const caps = track.getCapabilities?.() || {};
+    if (caps.zoom){
+      zoomRange.min = caps.zoom.min || 1;
+      zoomRange.max = caps.zoom.max || 3;
+      zoomRange.step = 0.1;
+      zoomRange.value = Math.min(1.5, zoomRange.max);
+      await applyZoom(parseFloat(zoomRange.value));
+      zoomRange.disabled = false;
+    }else{
+      zoomRange.disabled = true;
+    }
+    
+    // 手电筒检测
+    if (caps.torch){
+      btnTorch.disabled = false;
+    } else {
+      btnTorch.disabled = true;
+    }
+  } catch(err) {
+    throw err;
+  }
+}
+
+async function applyZoom(z){
+  if (!track?.applyConstraints) return;
+  zoomVal.textContent = z.toFixed(1) + '×';
+  try{
+    await track.applyConstraints({ advanced:[{ zoom: z }] });
+  }catch(e){
+    console.warn('Zoom failed:', e);
+  }
+}
+
+async function toggleTorch(){
+  if (!track?.applyConstraints) return;
+  try{
+    torchOn = !torchOn;
+    await track.applyConstraints({ advanced:[{ torch: torchOn }] });
+    btnTorch.textContent = torchOn ? '手电(开)' : '手电';
+  }catch{
+    toast('该设备不支持手电筒');
+  }
+}
+
+/** ================== 图像预处理 ================== */
+const tmp = document.createElement('canvas');
+const tctx = tmp.getContext('2d', { willReadFrequently:true });
+
+function extractROIImageData(){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return null;
+  
+  const sx = Math.floor(vw * ROI.x), sy = Math.floor(vh * ROI.y);
+  const sw = Math.floor(vw * ROI.w), sh = Math.floor(vh * ROI.h);
+  
+  tmp.width = sw; 
+  tmp.height = sh;
+  tctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+  
+  // 返回原始图像数据，不做过度处理
+  // 让解码器自己处理图像增强
+  return tctx.getImageData(0,0,sw,sh);
+}
+
+/** ================== WASM Worker ================== */
+const ZXING_WASM_MJS = 'https://unpkg.com/@sec-ant/zxing-wasm@2.3.4/dist/reader.min.mjs';
+const ZXING_WASM_BIN = 'https://unpkg.com/@sec-ant/zxing-wasm@2.3.4/dist/zxing_reader.wasm';
+
+function createWasmWorker(){
+  const workerCode = `
+    let decoderReady = false;
+    let reader = null;
+
+    async function init(){
+      try{
+        const mod = await import('${ZXING_WASM_MJS}');
+        reader = new mod.Reader({ 
+          wasmUrl: '${ZXING_WASM_BIN}',
+          formats: ['QRCode'],
+          tryHarder: true,
+          tryRotate: true,
+          tryInvert: true,
+          maxNumberOfSymbols: 255
+        });
+        await reader.load();
+        decoderReady = true;
+        postMessage({ type:'ready' });
+      }catch(e){
+        postMessage({ type:'error', msg: String(e) });
+      }
+    }
+    
+    // 图像预处理
+    function preprocessImage(imageData){
+      const data = new Uint8ClampedArray(imageData.data);
+      const width = imageData.width;
+      const height = imageData.height;
+      
+      // 转换为灰度并增强对比度
+      for (let i = 0; i < data.length; i += 4){
+        const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+        // 简单的对比度增强
+        const enhanced = gray < 128 ? Math.max(0, gray - 20) : Math.min(255, gray + 20);
+        data[i] = data[i+1] = data[i+2] = enhanced;
+      }
+      
+      return new ImageData(data, width, height);
+    }
+
+    onmessage = async (e) => {
+      const { type, imageData } = e.data || {};
+      if (type === 'init') return init();
+      if (!decoderReady || !imageData) return postMessage({ type:'res', ok:false });
+
+      try{
+        // 尝试原始图像
+        let res = await reader.decode(imageData);
+        
+        // 如果失败，尝试预处理后的图像
+        if (!res?.text){
+          const processed = preprocessImage(imageData);
+          res = await reader.decode(processed);
+        }
+        
+        if (res?.text) postMessage({ type:'res', ok:true, text: res.text });
+        else postMessage({ type:'res', ok:false });
+      }catch{
+        postMessage({ type:'res', ok:false });
+      }
+    };
+  `;
+  const blob = new Blob([workerCode], { type:'application/javascript' });
+  return new Worker(URL.createObjectURL(blob), { type:'module' });
+}
+
+/** ================== 解码主循环 ================== */
+function loop(){
+  if (!running) return;
+  
+  const step = () => {
+    if (!running) return;
+    fpsCounter.frames++;
+    (HTMLVideoElement.prototype.requestVideoFrameCallback
+      ? video.requestVideoFrameCallback(process)
+      : requestAnimationFrame(()=>process()));
+  };
+  
+  async function process(){
+    frameCounter++;
+    if (frameCounter % FRAME_DECODE_EVERY !== 0) return step();
+    if (busy) return step();
+    busy = true;
+    
+    const id = extractROIImageData();
+    if (!id){ busy=false; return step(); }
+    
+    scanStats.total++;
+    updateStats();
+    
+    // 优先WASM
+    if (useWorker){
+      useWorker.postMessage({ imageData: id }, [id.data.buffer]);
+    } else {
+      // 降级jsQR
+      // 尝试多种增强方式
+      let code = jsQR(id.data, id.width, id.height, { 
+        inversionAttempts: 'attemptBoth' 
+      });
+      
+      // 如果失败，尝试增强对比度
+      if (!code){
+        const enhanced = enhanceImageData(id);
+        code = jsQR(enhanced.data, enhanced.width, enhanced.height, {
+          inversionAttempts: 'attemptBoth'
+        });
+      }
+      busy = false;
+      if (code && code.data){
+        onDecode(code.data, 'jsQR');
+        setTimeout(step, 350);
+      } else {
+        failCount++;
+        step();
+      }
+    }
+  }
+  step();
+}
+
+/** ================== 解码成功处理 ================== */
+function onDecode(text, decoder='zxing-wasm'){
+  lastOkTime = performance.now();
+  failCount = 0;
+  scanStats.success++;
+  updateStats();
+  setDecoderTag(`解码器: ${decoder}`);
+  
+  // 解析分片
+  const parsed = parseFragment(text);
+  
+  if (parsed.isFragment){
+    // 处理分片
+    const key = `${parsed.batchId}_${parsed.total}`;
+    if (!fragments.has(key)){
+      fragments.set(key, {
+        total: parsed.total,
+        pieces: new Map(),
+        batchId: parsed.batchId,
+        lastScanned: null
+      });
+    }
+    
+    const batch = fragments.get(key);
+    
+    // 检查是否是新片段
+    if (!batch.pieces.has(parsed.index)){
+      batch.pieces.set(parsed.index, parsed.content);
+      batch.lastScanned = parsed.index;
+      currentBatch = key;
+      
+      // 显示详细提示
+      const remaining = parsed.total - batch.pieces.size;
+      if (remaining > 0){
+        toast(`✅ 片段 ${parsed.index}/${parsed.total} 已扫描，还需 ${remaining} 片`);
+      } else {
+        toast(`🎉 所有片段已收集完成！`);
+      }
+      
+      updateFragmentsUI();
+      playBeep();
+    } else {
+      // 重复片段，仅更新UI
+      toast(`⚠️ 片段 ${parsed.index} 已存在`, 1000);
+    }
+  } else {
+    // 单片直接显示
+    onDecodeSuccess(text, false);
+  }
+}
+
+function onDecodeSuccess(text, isFromFragments){
+  resultEl.textContent = text;
+  resultEl.className = 'result success';
+  
+  if (isFromFragments){
+    toast('✅ 所有片段已合并成功！', 3000);
+  } else {
+    toast('✅ 扫描成功！');
+  }
+  
+  playSuccessSound();
+  
+  // 如果是URL，可以自动跳转（注意安全性）
+  if (text.startsWith('http://') || text.startsWith('https://')){
+    setTimeout(()=>{
+      if (confirm('检测到链接，是否跳转？\n' + text)){
+        window.open(text, '_blank');
+      }
+    }, 500);
+  }
+}
+
+// 音效（简单的beep）
+function playBeep(){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.value = 800;
+  gain.gain.value = 0.1;
+  osc.start();
+  osc.stop(ctx.currentTime + 0.05);
+}
+
+function playSuccessSound(){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.value = 1000;
+  gain.gain.value = 0.15;
+  osc.start();
+  osc.stop(ctx.currentTime + 0.1);
+}
+
+/** ================== 图片上传处理 ================== */
+async function processUploadedImage(file){
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 限制最大尺寸
+    const maxSize = 1500;
+    let width = img.width;
+    let height = img.height;
+    
+    if (width > maxSize || height > maxSize){
+      const ratio = Math.min(maxSize/width, maxSize/height);
+      width *= ratio;
+      height *= ratio;
+    }
+    
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(img, 0, 0, width, height);
+    
+    const imageData = ctx.getImageData(0, 0, width, height);
+    
+    // 尝试jsQR解码
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: 'attemptBoth'
+    });
+    
+    if (code && code.data){
+      onDecode(code.data, 'jsQR(上传)');
+    } else {
+      toast('未检测到二维码，请确保图片清晰');
+      resultEl.textContent = '未检测到二维码';
+      resultEl.className = 'result';
+    }
+    
+    URL.revokeObjectURL(url);
+  };
+  
+  img.src = url;
+}
+
+/** ================== 事件绑定 ================== */
+btnStart.onclick = async () => {
+  try{
+    await startCamera();
+    running = true; 
+    btnStart.disabled = true; 
+    btnStop.disabled = false;
+    
+    // 初始化WASM worker
+    useWorker = createWasmWorker();
+    let workerReady = false, workerFailed = false;
+    
+    useWorker.onmessage = (e) => {
+      const { type } = e.data || {};
+      if (type === 'ready'){ 
+        workerReady = true; 
+        setDecoderTag('WASM就绪'); 
+        toast('🚀 WASM解码器加载成功');
+      }
+      if (type === 'error'){ 
+        workerFailed = true; 
+        setDecoderTag('jsQR(降级)', true); 
+        toast('⚠️ WASM加载失败，使用jsQR');
+        useWorker = null;
+      }
+      if (type === 'res'){
+        busy = false;
+        if (e.data.ok && e.data.text){
+          onDecode(e.data.text, 'zxing-wasm');
+          setTimeout(loop, 350);
+        }else{
+          failCount++;
+          loop();
+        }
+      }
+    };
+    
+    useWorker.postMessage({ type:'init' });
+    
+    // 开始扫描循环
+    setTimeout(loop, 500);
+    
+  }catch(err){
+    console.error(err);
+    toast('⚠️ 无法开启相机，请检查权限');
+    btnStart.disabled = false;
+  }
+};
+
+btnStop.onclick = async () => {
+  running = false;
+  btnStart.disabled = false; 
+  btnStop.disabled = true;
+  videoWrap.style.display = 'none';
+  
+  if (useWorker){ 
+    useWorker.terminate(); 
+    useWorker = null; 
+  }
+  if (track){ 
+    track.stop(); 
+  }
+  
+  stream = null; 
+  track = null;
+  setDecoderTag('已停止');
+  
+  // 重置统计
+  scanStats = { total: 0, success: 0 };
+  fragments.clear();
+  currentBatch = null;
+  fragmentsContainer.classList.remove('active');
+};
+
+btnTorch.onclick = toggleTorch;
+
+zoomRange.oninput = (e) => applyZoom(parseFloat(e.target.value));
+
+btnUpload.onclick = () => fileInput.click();
+
+fileInput.onchange = (e) => {
+  const file = e.target.files[0];
+  if (file){
+    processUploadedImage(file);
+  }
+};
+
+window.onresize = () => { 
+  if (video.videoWidth && overlay) {
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+  }
+};
+
+// 页面初始化
+window.onload = () => {
+  setDecoderTag('未初始化');
+  console.log('增强版二维码扫描器已加载');
+};
+// 图像增强函数
+function enhanceImageData(imageData){
+  const data = new Uint8ClampedArray(imageData.data);
+  
+  // 计算直方图
+  const histogram = new Array(256).fill(0);
+  for (let i = 0; i < data.length; i += 4){
+    const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+    histogram[gray]++;
+  }
+  
+  // 找到有效的最小和最大值（忽略极端值）
+  const total = data.length / 4;
+  const threshold = total * 0.01; // 1%的像素
+  let min = 0, max = 255;
+  let count = 0;
+  
+  for (let i = 0; i < 256; i++){
+    count += histogram[i];
+    if (count > threshold){
+      min = i;
+      break;
+    }
+  }
+  
+  count = 0;
+  for (let i = 255; i >= 0; i--){
+    count += histogram[i];
+    if (count > threshold){
+      max = i;
+      break;
+    }
+  }
+  
+  // 对比度拉伸
+  const range = max - min;
+  if (range > 0){
+    for (let i = 0; i < data.length; i += 4){
+      const gray = Math.round(data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+      const enhanced = Math.max(0, Math.min(255, ((gray - min) * 255) / range));
+      data[i] = data[i+1] = data[i+2] = enhanced;
+    }
+  }
+  
+  return new ImageData(data, imageData.width, imageData.height);
+}
+
+// 添加CSS动画
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
