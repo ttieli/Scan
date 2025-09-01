@@ -129,3 +129,22 @@ Thumbs.db
 *.bak
 *" 2.*"
 package\ 2.json
+
+# Internal/Development files
+deploy.sh
+groupscan.md
+test-validation/
+tests/
+TESTING.md
+
+# Generated test artifacts
+playwright-report/
+test-results/
+coverage/
+jest.config.js
+playwright.config.js
+
+# Test/Development tools
+qr-generator.html
+qr-scanner-enhanced.html
+qr-tool.html
