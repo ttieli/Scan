@@ -5,9 +5,12 @@
 
 class ResourceLoader {
     constructor() {
+        // 使用全局config配置，如果存在的话
+        const basePath = (typeof config !== 'undefined' && config.basePath) ? config.basePath : '';
+        
         this.resources = {
             qrcode: {
-                local: 'libs/qrcode.min.js',
+                local: basePath ? `${basePath}/libs/qrcode.min.js` : 'libs/qrcode.min.js',
                 cdns: [
                     'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
                     'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
@@ -16,7 +19,7 @@ class ResourceLoader {
                 test: () => typeof QRCode !== 'undefined'
             },
             jsQR: {
-                local: 'libs/jsQR.js',
+                local: basePath ? `${basePath}/libs/jsQR.js` : 'libs/jsQR.js',
                 cdns: [
                     'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js',
                     'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js',
