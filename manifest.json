@@ -2,57 +2,57 @@
   "name": "QR数据传输系统",
   "short_name": "QR传输",
   "description": "通过二维码实现跨网络的安全数据传输，支持离线使用",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4CAF50",
   "orientation": "any",
-  "scope": "/",
+  "scope": "./",
   "icons": [
     {
-      "src": "/public/icons/icon-72x72.png",
+      "src": "public/icons/icon-72x72.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-96x96.png",
+      "src": "public/icons/icon-96x96.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-128x128.png",
+      "src": "public/icons/icon-128x128.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-144x144.png",
+      "src": "public/icons/icon-144x144.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-152x152.png",
+      "src": "public/icons/icon-152x152.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-192x192.png",
+      "src": "public/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-384x384.png",
+      "src": "public/icons/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/public/icons/icon-512x512.png",
+      "src": "public/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -63,7 +63,7 @@
       "name": "发送数据",
       "short_name": "发送",
       "description": "打开QR码发送器",
-      "url": "/sender.html",
+      "url": "./sender.html",
       "icons": [
         {
           "src": "icons/send-96x96.png",
@@ -76,7 +76,7 @@
       "name": "接收数据",
       "short_name": "接收",
       "description": "打开QR码接收器",
-      "url": "/receiver.html",
+      "url": "./receiver.html",
       "icons": [
         {
           "src": "icons/receive-96x96.png",

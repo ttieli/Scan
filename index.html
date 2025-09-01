@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR数据传输系统</title>
 <!-- PWA支持 -->
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4CAF50">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="QR传输">
-<link rel="icon" type="image/x-icon" href="/public/favicon.ico">
-<link rel="apple-touch-icon" href="/public/icons/image.png">
+<link rel="icon" type="image/x-icon" href="public/icons/favicon-32x32.png">
+<link rel="apple-touch-icon" href="public/icons/apple-touch-icon.png">
 <style>
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -121,7 +121,7 @@ h1 {
 // PWA Service Worker 注册
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
+        navigator.serviceWorker.register('service-worker.js')
             .then(registration => {
                 console.log('ServiceWorker registration successful:', registration.scope);
             })
