@@ -1,0 +1,26 @@
+{
+  "name": "qr-data-transfer-tests",
+  "version": "1.0.0",
+  "description": "Test suite for QR Data Transfer System",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "playwright test",
+    "test:security": "jest tests/security",
+    "test:performance": "jest tests/performance",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:security && npm run test:performance && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jsdom": "^23.0.0",
+    "qrcode": "^1.5.3",
+    "qrcode-reader": "^1.0.4",
+    "http-server": "^14.1.1"
+  }
+}
