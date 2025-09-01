@@ -1,7 +1,7 @@
 // Service Worker for QR Data Transfer System
 // Version: 1.0.0
 
-const CACHE_NAME = 'qr-transfer-v1.1';
+const CACHE_NAME = 'qr-transfer-v1.1.0';
 
 // 检测是否在GitHub Pages上运行
 const isGitHubPages = self.location.hostname === 'ttieli.github.io';

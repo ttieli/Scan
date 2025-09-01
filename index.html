@@ -30,6 +30,17 @@ h1 {
     color: #666;
     margin-bottom: 40px;
 }
+.version-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #666;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
 .tools {
     display: flex;
     flex-direction: column;
@@ -114,11 +125,25 @@ h1 {
 </div>
 
 <div class="footer">
-    <p>© 2024 QR数据传输系统 | <a href="https://github.com/ttieli/Scan" style="color: #666;">GitHub</a></p>
+    <p>© 2025 QR数据传输系统 | <a href="https://github.com/ttieli/Scan" style="color: #666;">GitHub</a> | <a href="CHANGELOG.md" style="color: #666;">更新日志</a></p>
+</div>
+
+<div class="version-info" id="versionInfo">
+    <span>v1.1.0</span>
 </div>
 
 <script src="config.js"></script>
 <script>
+// 加载版本信息
+fetch('version.json')
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('versionInfo').innerHTML = `
+            <span title="${data.codename} - ${data.releaseDate}">v${data.version}</span>
+        `;
+    })
+    .catch(err => console.log('Failed to load version info:', err));
+
 // PWA Service Worker 注册
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
