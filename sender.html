@@ -65,7 +65,7 @@ function generateQR() {
     display.innerHTML = '';
     
     // 分片处理 - 使用较小的分片大小以确保QR码不会溢出
-    const chunks = chunkText(text, 400);
+    const chunks = chunkText(text, 300);
     qrCodes = [];
     
     chunks.forEach((chunk, index) => {
@@ -92,15 +92,19 @@ function generateQR() {
     });
 }
 
-function chunkText(text, size) {
-    // 减小分片大小以确保加上JSON元数据后不超过QR码容量
-    // QR码M级纠错下，约可存储2000个字符
-    // JSON格式 {"i":1,"t":1,"d":"..."} 需要约20个字符的开销
-    const effectiveSize = size - 50; // 预留元数据空间
+function chunkText(text, maxSize) {
+    // QR码容量限制：纠错级别M下，200x200像素约可存储500-600字符
+    // JSON元数据格式: {"i":1,"t":1,"d":"..."} 
+    // 需要预留空间给JSON结构和可能的特殊字符转义
+    
+    // 保守估计：每片最多250字符，确保不会溢出
+    const effectiveSize = Math.min(maxSize, 250);
     const chunks = [];
+    
     for (let i = 0; i < text.length; i += effectiveSize) {
         chunks.push(text.slice(i, i + effectiveSize));
     }
+    
     return chunks;
 }
 
