@@ -6,12 +6,115 @@
 <title>QR接收端 - 完全离线版</title>
 <style>
 /* 样式 */
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-.container { max-width: 800px; margin: 0 auto; }
-.section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; }
-.btn { background: #4CAF50; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; }
-#video { width: 100%; max-width: 500px; border-radius: 10px; }
-#output { background: #f8f9fa; padding: 15px; border-radius: 8px; min-height: 100px; margin-top: 20px; }
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+    margin: 0; 
+    padding: 10px; 
+    background: #f5f5f5; 
+    -webkit-text-size-adjust: 100%;
+}
+.container { 
+    max-width: 800px; 
+    margin: 0 auto; 
+}
+.section { 
+    background: white; 
+    padding: 15px; 
+    margin-bottom: 15px; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.btn { 
+    background: #4CAF50; 
+    color: white; 
+    border: none; 
+    padding: 12px 24px; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-size: 16px;
+    width: 100%;
+    margin-bottom: 10px;
+}
+.btn:active { background: #45a049; }
+
+#video { 
+    width: 100%; 
+    max-width: 100%; 
+    height: auto;
+    border-radius: 10px; 
+    margin: 10px 0;
+    background: #000;
+}
+
+#output { 
+    background: #f8f9fa; 
+    padding: 15px; 
+    border-radius: 8px; 
+    min-height: 80px; 
+    margin-top: 10px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    border: 2px solid #e9ecef;
+}
+
+#status { 
+    margin-top: 10px; 
+    padding: 10px; 
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    border-radius: 6px;
+    border-left: 4px solid #2196f3;
+    color: #1565c0; 
+    font-size: 14px; 
+    font-weight: 500;
+}
+
+.progress-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff3cd;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 4px solid #ffc107;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #856404;
+}
+
+.scanning-indicator {
+    background: #d1ecf1;
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
+.success-indicator {
+    background: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+/* iOS Safari 特殊优化 */
+@supports (-webkit-appearance: none) {
+    .btn {
+        -webkit-appearance: none;
+        border-radius: 8px;
+    }
+    
+    #video {
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    body { padding: 5px; }
+    .section { padding: 12px; margin-bottom: 10px; }
+    #video { max-height: 300px; object-fit: cover; }
+    .btn { padding: 14px 20px; font-size: 16px; }
+}
 </style>
 </head>
 <body>
@@ -19,16 +122,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; m
     <div class="section">
         <h1>📥 QR接收端</h1>
         <p>完全离线版 - 扫描二维码接收数据</p>
-        <p style="color: #999; font-size: 11px;">版本: 2025-09-02 20:15:00 | 支持Base64中文解码 | 同步测试修复</p>
-        <button class="btn" onclick="startScan()">启动摄像头</button>
+        <p style="color: #999; font-size: 11px;">版本: 2025-09-02 20:30:00 | 支持Base64中文解码 | iOS Safari优化</p>
+        
+        <button class="btn" id="scanBtn" onclick="startScan()">🎥 启动摄像头</button>
+        <button class="btn" id="stopBtn" onclick="stopScan()" style="display:none; background:#dc3545;">⏹️ 停止扫描</button>
+        
+        <div id="scanStatus" class="progress-indicator" style="display:none;">
+            <span id="scanProgress">准备中...</span>
+            <span id="scanCount">0/0</span>
+        </div>
+        
         <video id="video" style="display:none;"></video>
         <canvas id="canvas" style="display:none;"></canvas>
     </div>
     
     <div class="section">
-        <h2>接收的数据</h2>
+        <h2>📄 接收的数据</h2>
+        <div id="chunksList" style="display:none; margin-bottom: 10px;">
+            <small style="color: #666;">已接收片段：</small>
+            <div id="chunksPreview" style="font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 5px; border-radius: 4px; margin-top: 5px;"></div>
+        </div>
         <div id="output">等待扫描...</div>
-        <div id="status" style="margin-top: 10px; color: #666; font-size: 12px;"></div>
+        <div id="status"></div>
     </div>
 </div>
 
@@ -10171,6 +10286,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 let video, canvas, context;
 let chunks = {};
 let scanning = false;
+let totalChunks = 0;
+let scanningStartTime = Date.now();
 
 async function startScan() {
     video = document.getElementById('video');
@@ -10179,19 +10296,78 @@ async function startScan() {
     
     // 重置状态
     chunks = {};
-    document.getElementById('status').textContent = '正在启动摄像头...';
+    totalChunks = 0;
+    scanningStartTime = Date.now();
+    
+    // 更新UI状态
+    document.getElementById('scanBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'block';
+    document.getElementById('scanStatus').style.display = 'flex';
+    document.getElementById('scanStatus').className = 'progress-indicator scanning-indicator';
+    updateScanProgress('正在启动摄像头...', 0, 0);
     
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        
         video.srcObject = stream;
         video.style.display = 'block';
         video.play();
         scanning = true;
-        document.getElementById('status').textContent = '扫描中...请将QR码对准摄像头';
-        scan();
+        
+        updateScanProgress('📷 扫描中...请将QR码对准摄像头', 0, 0);
+        
+        // iOS Safari 兼容性：等待视频加载完成
+        video.onloadedmetadata = () => {
+            console.log('视频流已就绪，开始扫描');
+            scan();
+        };
+        
+        // 备用启动方式
+        setTimeout(() => {
+            if (scanning && video.readyState >= 2) {
+                scan();
+            }
+        }, 1000);
+        
     } catch (err) {
-        alert('无法访问摄像头: ' + err);
-        document.getElementById('status').textContent = '摄像头访问失败';
+        console.error('摄像头访问失败:', err);
+        alert('无法访问摄像头: ' + err.message);
+        updateScanProgress('❌ 摄像头访问失败: ' + err.message, 0, 0);
+        resetScanUI();
+    }
+}
+
+function stopScan() {
+    scanning = false;
+    if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.style.display = 'none';
+    }
+    resetScanUI();
+    updateScanProgress('⏹️ 扫描已停止', Object.keys(chunks).length, totalChunks);
+}
+
+function resetScanUI() {
+    document.getElementById('scanBtn').style.display = 'block';
+    document.getElementById('stopBtn').style.display = 'none';
+}
+
+function updateScanProgress(message, received, total) {
+    document.getElementById('scanProgress').textContent = message;
+    document.getElementById('scanCount').textContent = `${received}/${total}`;
+    
+    // 更新状态栏样式
+    const statusEl = document.getElementById('scanStatus');
+    if (received === total && total > 0) {
+        statusEl.className = 'progress-indicator success-indicator';
+    } else if (received > 0) {
+        statusEl.className = 'progress-indicator';
     }
 }
 
@@ -10230,17 +10406,32 @@ function scan() {
                         }
                     }
                     chunks[data.i] = decodedChunk;
+                    totalChunks = data.t;
+                    
                     updateOutput();
+                    updateScanProgress('🔍 扫描中...', Object.keys(chunks).length, totalChunks);
+                    
+                    // 播放提示音（如果支持）
+                    try {
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmzQQ==');
+                        audio.volume = 0.3;
+                        audio.play();
+                    } catch (e) {}
                     
                     if (Object.keys(chunks).length === data.t) {
                         const fullText = Object.keys(chunks)
-                            .sort((a, b) => a - b)
+                            .sort((a, b) => parseInt(a) - parseInt(b))
                             .map(key => chunks[key])
                             .join('');
+                        
                         document.getElementById('output').textContent = fullText;
+                        document.getElementById('chunksList').style.display = 'none';
+                        
+                        // 完成状态
+                        updateScanProgress('✅ 扫描完成！', data.t, data.t);
+                        
                         scanning = false;
-                        video.srcObject.getTracks().forEach(track => track.stop());
-                        video.style.display = 'none';
+                        stopScan();
                     }
                 } else {
                     // 不是我们格式的QR码，显示原始数据
@@ -10263,16 +10454,49 @@ function updateOutput() {
     const statusEl = document.getElementById('status');
     
     if (received > 0) {
-        const maxIndex = Math.max(...Object.keys(chunks).map(k => parseInt(k)));
-        statusEl.textContent = `已扫描 ${received} / ${maxIndex} 片QR码`;
+        // 显示进度
+        statusEl.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📦 已接收片段: ${received}/${totalChunks}</span>
+                <span style="font-size: 12px;">${Math.round(received/totalChunks*100)}%</span>
+            </div>
+        `;
         
-        // 显示已接收的片段预览
+        // 显示已接收的片段列表
+        const chunksListEl = document.getElementById('chunksList');
+        const chunksPreviewEl = document.getElementById('chunksPreview');
+        
+        if (chunksListEl && chunksPreviewEl) {
+            chunksListEl.style.display = 'block';
+            
+            const sortedChunks = Object.keys(chunks).sort((a, b) => parseInt(a) - parseInt(b));
+            const chunkNumbers = Array.from({length: totalChunks}, (_, i) => i + 1);
+            
+            chunksPreviewEl.innerHTML = chunkNumbers.map(num => {
+                const received = chunks[num];
+                return `<span style="
+                    display: inline-block; 
+                    margin: 2px; 
+                    padding: 2px 6px; 
+                    border-radius: 3px; 
+                    font-size: 11px;
+                    background: ${received ? '#d4edda' : '#f8d7da'}; 
+                    color: ${received ? '#155724' : '#721c24'};
+                ">${num}</span>`;
+            }).join('');
+        }
+        
+        // 显示已接收内容的预览
         const preview = Object.keys(chunks)
             .sort((a, b) => parseInt(a) - parseInt(b))
             .map(key => chunks[key])
             .join('');
         if (preview) {
-            document.getElementById('output').textContent = preview;
+            const truncatedPreview = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
+            document.getElementById('output').innerHTML = `
+                <div style="color: #666; font-size: 12px; margin-bottom: 8px;">实时预览 (${preview.length}字符):</div>
+                <div>${truncatedPreview}</div>
+            `;
         }
     }
 }
