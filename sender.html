@@ -28,7 +28,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="header">
         <h1>📤 QR数据发送器</h1>
         <p>完全离线版 - 无需网络连接</p>
-        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 16:45:00 | Base64编码支持中文</p>
+        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 20:15:00 | Base64编码支持中文 | 增强溢出保护</p>
     </div>
     
     <div class="section">
@@ -95,6 +95,15 @@ function generateQR() {
         console.log(`片${index + 1}: 原始长度=${chunk.length}, Base64长度=${encodedChunk.length}, JSON长度=${qrData.length}`);
         
         try {
+            // 更严格的数据长度检查，防止溢出
+            if (qrData.length > 400) {
+                console.error(`片${index + 1}数据严重超长(${qrData.length}字符)，跳过生成`);
+                throw new Error(`数据长度${qrData.length}超过安全限制`);
+            }
+            if (qrData.length > 250) {
+                console.warn(`片${index + 1}数据过长(${qrData.length}字符)，强制使用L级纠错`);
+            }
+            
             new QRCode(qrDiv, {
                 text: qrData,
                 width: 200,
