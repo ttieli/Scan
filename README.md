@@ -108,6 +108,14 @@ Scan/
 - 📋 临时数据分享
 - 🚀 无需安装APP的快速传输
 
+## 📚 项目文档
+
+- [更新日志](docs/CHANGELOG.md) - 版本历史和更新内容
+- [功能特性](docs/FEATURES.md) - 详细功能说明
+- [开发指南](docs/DEVELOPMENT.md) - 开发环境搭建
+- [贡献指南](docs/CONTRIBUTING.md) - 如何参与贡献
+- [项目结构](docs/PROJECT_STRUCTURE.md) - 代码结构说明
+
 ## License
 
 MIT License
