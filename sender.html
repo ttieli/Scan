@@ -28,7 +28,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="header">
         <h1>📤 QR数据发送器</h1>
         <p>完全离线版 - 无需网络连接</p>
-        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 15:55:14 | 每片最大: 25字符（支持中文）</p>
+        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 16:45:00 | Base64编码支持中文</p>
     </div>
     
     <div class="section">
@@ -65,8 +65,8 @@ function generateQR() {
     const display = document.getElementById('qrDisplay');
     display.innerHTML = '';
     
-    // 分片处理 - 使用极小的分片大小以确保中文也不会溢出
-    const chunks = chunkText(text, 25);
+    // 使用Base64编码以支持中文，分片大小为15（Base64会增大体积）
+    const chunks = chunkText(text, 15);
     qrCodes = [];
     
     chunks.forEach((chunk, index) => {
@@ -82,35 +82,29 @@ function generateQR() {
         
         display.appendChild(container);
         
-        // 确保QR码数据不超过限制
-        const qrData = JSON.stringify({i: index + 1, t: chunks.length, d: chunk});
+        // 使用Base64编码处理中文
+        const encodedChunk = btoa(unescape(encodeURIComponent(chunk)));
+        const qrData = JSON.stringify({
+            i: index + 1, 
+            t: chunks.length, 
+            d: encodedChunk,
+            e: 'b64' // 标记为Base64编码
+        });
         
         // 调试：输出实际数据长度
-        console.log(`片${index + 1}: 原始chunk长度=${chunk.length}, JSON长度=${qrData.length}`);
-        
-        // 如果数据太长，进一步截断
-        const maxQRLength = 300; // 超级保守，考虑中文占3倍空间
-        let finalData = qrData;
-        
-        if (qrData.length > maxQRLength) {
-            // 计算需要截断多少字符
-            const excess = qrData.length - maxQRLength;
-            const truncatedChunk = chunk.substring(0, chunk.length - excess - 10); // 额外减10个字符以确保安全
-            finalData = JSON.stringify({i: index + 1, t: chunks.length, d: truncatedChunk});
-            console.log(`截断后: chunk长度=${truncatedChunk.length}, JSON长度=${finalData.length}`);
-        }
+        console.log(`片${index + 1}: 原始长度=${chunk.length}, Base64长度=${encodedChunk.length}, JSON长度=${qrData.length}`);
         
         try {
             new QRCode(qrDiv, {
-                text: finalData,
+                text: qrData,
                 width: 200,
                 height: 200,
-                correctLevel: QRCode.CorrectLevel.M
+                correctLevel: QRCode.CorrectLevel.L // 使用L级纠错以减少数据量
             });
         } catch (e) {
             console.error('QR生成失败:', e);
-            console.error('失败的数据长度:', finalData.length);
-            console.error('失败的数据内容:', finalData);
+            console.error('失败的数据长度:', qrData.length);
+            console.error('失败的数据内容:', qrData);
             qrDiv.innerHTML = '<div style="color:red;">QR码生成失败，数据过长</div>';
         }
         
@@ -119,18 +113,10 @@ function generateQR() {
 }
 
 function chunkText(text, maxSize) {
-    // QR码容量限制问题：
-    // - 纠错级别M下，理论上可存储688个数据单位
-    // - 但中文字符在QR码中会被编码成UTF-8，每个中文字符约占15-20个数据单位！
-    // - "Hello World! 这是完全离线的QR码传输系统。" 虽然只有28个字符
-    // - 但在QR码中占用约692个数据单位（超过了688的限制）
-    
-    // 解决方案：极小的分片，确保即使全是中文也不会超限
-    // 假设最坏情况：每个中文字符占20个单位
-    // 688 / 20 = 34个字符的安全上限
-    // 减去JSON开销（约30单位），实际安全值约30个字符
-    
-    const effectiveSize = Math.min(maxSize, 25); // 极度保守，确保安全
+    // 使用Base64编码解决中文字符问题
+    // Base64编码会增加约33%的数据量
+    // 所以要相应减少每片的字符数
+    const effectiveSize = Math.min(maxSize, 15);
     const chunks = [];
     
     for (let i = 0; i < text.length; i += effectiveSize) {
