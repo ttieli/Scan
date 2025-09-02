@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR数据传输系统 - 完全离线版</title>
+    <meta name="description" content="通过二维码实现完全离线的数据传输系统">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        
+        .version {
+            text-align: center;
+            color: #999;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        
+        .version .badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+        
+        .tools {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .tool-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-decoration: none;
+            color: white;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            text-align: left;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .tool-card.receiver {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .tool-card.receiver:hover {
+            box-shadow: 0 10px 30px rgba(245, 87, 108, 0.4);
+        }
+        
+        .tool-card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .tool-card p {
+            font-size: 1rem;
+            opacity: 0.95;
+            line-height: 1.5;
+        }
+        
+        .features {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+        
+        .features h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .feature-list {
+            display: grid;
+            gap: 10px;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+        }
+        
+        .feature-item::before {
+            content: "✓";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #999;
+            font-size: 0.9rem;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .tool-card h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📡 QR数据传输系统</h1>
+        <p class="subtitle">完全离线的二维码数据传输解决方案</p>
+        <div class="version">
+            版本 2.0.0 <span class="badge">纯离线版</span>
+        </div>
+        
+        <div class="tools">
+            <button class="tool-card" onclick="location.href='sender.html'">
+                <h2>📤 发送端</h2>
+                <p>将文本数据转换为二维码，支持自动分片和多种显示模式。适用于需要传输数据的设备。</p>
+            </button>
+            
+            <button class="tool-card receiver" onclick="location.href='receiver.html'">
+                <h2>📥 接收端</h2>
+                <p>通过摄像头扫描二维码接收数据，支持自动合并多片数据。适用于手机等移动设备。</p>
+            </button>
+        </div>
+        
+        <div class="features">
+            <h3>✨ 核心特性</h3>
+            <div class="feature-list">
+                <div class="feature-item">完全离线运行，无需网络连接</div>
+                <div class="feature-item">所有代码内嵌，单文件即可使用</div>
+                <div class="feature-item">支持超长文本自动分片传输</div>
+                <div class="feature-item">平铺/循环两种显示模式</div>
+                <div class="feature-item">智能纠错，确保数据完整性</div>
+                <div class="feature-item">跨平台兼容，支持各种设备</div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>💡 提示：本系统完全在浏览器本地运行，数据不会上传到任何服务器</p>
+            <p style="margin-top: 10px;">© 2025 QR Transfer System - MIT License</p>
+        </div>
+    </div>
+
+    <script>
+        // 简单的页面增强
+        console.log('QR数据传输系统 - 完全离线版');
+        console.log('版本: 2.0.0');
+        console.log('特性: 完全离线、单文件运行、无外部依赖');
+        
+        // 检测运行环境
+        if (window.location.protocol === 'file:') {
+            console.log('检测到本地文件运行模式');
+        } else {
+            console.log('运行在: ' + window.location.host);
+        }
+    </script>
+</body>
+</html>
