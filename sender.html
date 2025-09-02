@@ -81,24 +81,38 @@ function generateQR() {
         
         display.appendChild(container);
         
-        new QRCode(qrDiv, {
-            text: JSON.stringify({i: index + 1, t: chunks.length, d: chunk}),
-            width: 200,
-            height: 200,
-            correctLevel: QRCode.CorrectLevel.M
-        });
+        // 确保QR码数据不超过限制
+        const qrData = JSON.stringify({i: index + 1, t: chunks.length, d: chunk});
+        
+        // 如果数据太长，进一步截断
+        const maxQRLength = 500; // 更保守的限制，确保安全
+        const finalData = qrData.length > maxQRLength 
+            ? JSON.stringify({i: index + 1, t: chunks.length, d: chunk.substring(0, chunk.length - (qrData.length - maxQRLength))})
+            : qrData;
+        
+        try {
+            new QRCode(qrDiv, {
+                text: finalData,
+                width: 200,
+                height: 200,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        } catch (e) {
+            console.error('QR生成失败:', e);
+            qrDiv.innerHTML = '<div style="color:red;">QR码生成失败，数据过长</div>';
+        }
         
         qrCodes.push(container);
     });
 }
 
 function chunkText(text, maxSize) {
-    // QR码容量限制：纠错级别M下，200x200像素约可存储500-600字符
-    // JSON元数据格式: {"i":1,"t":1,"d":"..."} 
-    // 需要预留空间给JSON结构和可能的特殊字符转义
+    // QR码容量限制：纠错级别M下，约可存储688字符
+    // JSON元数据格式: {"i":1,"t":1,"d":"..."} 约需30字符
+    // 特殊字符转义可能增加长度
     
-    // 保守估计：每片最多250字符，确保不会溢出
-    const effectiveSize = Math.min(maxSize, 250);
+    // 非常保守的估计：每片最多200字符
+    const effectiveSize = Math.min(maxSize, 200);
     const chunks = [];
     
     for (let i = 0; i < text.length; i += effectiveSize) {
