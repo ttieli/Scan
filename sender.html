@@ -28,7 +28,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="header">
         <h1>📤 QR数据发送器</h1>
         <p>完全离线版 - 无需网络连接</p>
-        <p style="color: #999; font-size: 11px; margin-top: 5px;">更新: 2025-09-02 11:35 | 每片最大: 100字符</p>
+        <p style="color: #999; font-size: 11px; margin-top: 5px;">更新: 2025-09-02 11:36 | 每片最大: 25字符（支持中文）</p>
     </div>
     
     <div class="section">
@@ -65,8 +65,8 @@ function generateQR() {
     const display = document.getElementById('qrDisplay');
     display.innerHTML = '';
     
-    // 分片处理 - 使用很小的分片大小以确保QR码绝对不会溢出
-    const chunks = chunkText(text, 100);
+    // 分片处理 - 使用极小的分片大小以确保中文也不会溢出
+    const chunks = chunkText(text, 25);
     qrCodes = [];
     
     chunks.forEach((chunk, index) => {
@@ -119,12 +119,18 @@ function generateQR() {
 }
 
 function chunkText(text, maxSize) {
-    // QR码容量限制：纠错级别M下，约可存储688字符
-    // 但是！中文等Unicode字符在QR码中会占用3倍空间
-    // JSON元数据格式: {"i":1,"t":1,"d":"..."} 约需30字符
+    // QR码容量限制问题：
+    // - 纠错级别M下，理论上可存储688个数据单位
+    // - 但中文字符在QR码中会被编码成UTF-8，每个中文字符约占15-20个数据单位！
+    // - "Hello World! 这是完全离线的QR码传输系统。" 虽然只有28个字符
+    // - 但在QR码中占用约692个数据单位（超过了688的限制）
     
-    // 超级保守：每片最多100字符，即使全是中文也安全
-    const effectiveSize = Math.min(maxSize, 100);
+    // 解决方案：极小的分片，确保即使全是中文也不会超限
+    // 假设最坏情况：每个中文字符占20个单位
+    // 688 / 20 = 34个字符的安全上限
+    // 减去JSON开销（约30单位），实际安全值约30个字符
+    
+    const effectiveSize = Math.min(maxSize, 25); // 极度保守，确保安全
     const chunks = [];
     
     for (let i = 0; i < text.length; i += effectiveSize) {
