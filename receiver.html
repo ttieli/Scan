@@ -39,11 +39,48 @@ body {
 
 #video { 
     width: 100%; 
-    max-width: 100%; 
+    max-width: 320px; /* 限制最大宽度 */
+    max-height: 240px; /* 限制最大高度 */
     height: auto;
     border-radius: 10px; 
     margin: 10px 0;
     background: #000;
+    object-fit: cover; /* 保持比例，裁剪多余部分 */
+    transition: all 0.3s ease;
+}
+
+#video.hidden {
+    display: none !important;
+}
+
+#video.minimized {
+    max-width: 200px;
+    max-height: 150px;
+    opacity: 0.8;
+}
+
+.video-controls {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.video-controls button {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 80px;
+}
+
+.video-controls button:active {
+    background: #5a6268;
 }
 
 #output { 
@@ -112,8 +149,36 @@ body {
 @media (max-width: 768px) {
     body { padding: 5px; }
     .section { padding: 12px; margin-bottom: 10px; }
-    #video { max-height: 300px; object-fit: cover; }
+    
+    #video { 
+        max-width: 280px; /* 移动端进一步限制宽度 */
+        max-height: 210px; /* 移动端进一步限制高度 */
+        object-fit: cover; 
+    }
+    
+    #video.minimized {
+        max-width: 150px;
+        max-height: 112px;
+    }
+    
     .btn { padding: 14px 20px; font-size: 16px; }
+    
+    .video-controls button {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    #video { 
+        max-width: 240px; /* 超小屏幕更小的视频尺寸 */
+        max-height: 180px; 
+    }
+    
+    #video.minimized {
+        max-width: 120px;
+        max-height: 90px;
+    }
 }
 </style>
 </head>
@@ -122,7 +187,7 @@ body {
     <div class="section">
         <h1>📥 QR接收端</h1>
         <p>完全离线版 - 扫描二维码接收数据</p>
-        <p style="color: #999; font-size: 11px;">版本: 2025-09-02 20:30:00 | 支持Base64中文解码 | iOS Safari优化</p>
+        <p style="color: #999; font-size: 11px;">版本: 2025-09-02 20:45:00 | 支持Base64中文解码 | 摄像头显示控制</p>
         
         <button class="btn" id="scanBtn" onclick="startScan()">🎥 启动摄像头</button>
         <button class="btn" id="stopBtn" onclick="stopScan()" style="display:none; background:#dc3545;">⏹️ 停止扫描</button>
@@ -130,6 +195,12 @@ body {
         <div id="scanStatus" class="progress-indicator" style="display:none;">
             <span id="scanProgress">准备中...</span>
             <span id="scanCount">0/0</span>
+        </div>
+        
+        <div class="video-controls" id="videoControls" style="display:none;">
+            <button onclick="toggleVideo()">👁️ 隐藏/显示</button>
+            <button onclick="minimizeVideo()">📱 最小化</button>
+            <button onclick="normalizeVideo()">📺 正常大小</button>
         </div>
         
         <video id="video" style="display:none;"></video>
@@ -10320,6 +10391,9 @@ async function startScan() {
         video.play();
         scanning = true;
         
+        // 显示视频控制按钮
+        document.getElementById('videoControls').style.display = 'flex';
+        
         updateScanProgress('📷 扫描中...请将QR码对准摄像头', 0, 0);
         
         // iOS Safari 兼容性：等待视频加载完成
@@ -10356,6 +10430,7 @@ function stopScan() {
 function resetScanUI() {
     document.getElementById('scanBtn').style.display = 'block';
     document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('videoControls').style.display = 'none';
 }
 
 function updateScanProgress(message, received, total) {
@@ -10499,6 +10574,27 @@ function updateOutput() {
             `;
         }
     }
+}
+
+// 视频控制函数
+function toggleVideo() {
+    const video = document.getElementById('video');
+    if (video.classList.contains('hidden')) {
+        video.classList.remove('hidden');
+    } else {
+        video.classList.add('hidden');
+    }
+}
+
+function minimizeVideo() {
+    const video = document.getElementById('video');
+    video.classList.remove('hidden');
+    video.classList.add('minimized');
+}
+
+function normalizeVideo() {
+    const video = document.getElementById('video');
+    video.classList.remove('hidden', 'minimized');
 }
 </script>
 </body>
