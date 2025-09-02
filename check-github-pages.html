@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages 状态检查</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .status-card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-loading { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #1976D2;
+        }
+        .version-info {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .test-link {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .test-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 GitHub Pages 状态检查</h1>
+    
+    <div class="status-card">
+        <h2>当前状态</h2>
+        <button class="btn" onclick="checkAllStatus()">刷新状态</button>
+        <button class="btn" onclick="clearCache()">清除缓存</button>
+        
+        <div id="status-list">
+            <div class="status-item status-loading">
+                <span>正在检查状态...</span>
+                <span>⏳</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h2>版本信息</h2>
+        <div id="version-details" class="version-info">
+            正在加载版本信息...
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h2>快速测试</h2>
+        <p>点击下方链接测试GitHub Pages各个页面：</p>
+        <div>
+            <a href="https://ttieli.github.io/Scan/" class="test-link" target="_blank">🏠 主页</a> |
+            <a href="https://ttieli.github.io/Scan/sender.html" class="test-link" target="_blank">📤 发送端</a> |
+            <a href="https://ttieli.github.io/Scan/receiver.html" class="test-link" target="_blank">📥 接收端</a> |
+            <a href="https://ttieli.github.io/Scan/version.json" class="test-link" target="_blank">📋 版本信息</a>
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h2>部署历史</h2>
+        <div id="deploy-info">
+            <div class="version-info">
+                <strong>v1.1.0 "Phoenix"</strong><br>
+                发布日期: 2025-01-01<br>
+                主要更新: 修复资源加载问题，完整版本管理系统<br>
+                Git标签: ✅ 已创建并推送<br>
+                状态: 🚀 已部署
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = 'https://ttieli.github.io/Scan';
+        
+        async function checkStatus(url, name) {
+            try {
+                const response = await fetch(url, { 
+                    method: 'HEAD',
+                    cache: 'no-cache'
+                });
+                return {
+                    name: name,
+                    url: url,
+                    status: response.ok ? 'ok' : 'error',
+                    code: response.status,
+                    message: response.ok ? '正常' : `HTTP ${response.status}`
+                };
+            } catch (error) {
+                return {
+                    name: name,
+                    url: url,
+                    status: 'error',
+                    code: 0,
+                    message: '连接失败'
+                };
+            }
+        }
+
+        async function checkAllStatus() {
+            const statusList = document.getElementById('status-list');
+            statusList.innerHTML = '<div class="status-item status-loading"><span>检查中...</span><span>⏳</span></div>';
+            
+            const checks = [
+                { url: `${baseUrl}/`, name: '主页' },
+                { url: `${baseUrl}/sender.html`, name: '发送端' },
+                { url: `${baseUrl}/receiver.html`, name: '接收端' },
+                { url: `${baseUrl}/version.json`, name: '版本信息' },
+                { url: `${baseUrl}/service-worker.js`, name: 'Service Worker' },
+                { url: `${baseUrl}/manifest.json`, name: 'PWA清单' },
+                { url: `${baseUrl}/libs/qrcode.min.js`, name: 'QRCode库' },
+                { url: `${baseUrl}/js/resource-loader.js`, name: '资源加载器' }
+            ];
+            
+            const results = await Promise.all(
+                checks.map(check => checkStatus(check.url, check.name))
+            );
+            
+            statusList.innerHTML = results.map(result => {
+                const statusClass = result.status === 'ok' ? 'status-ok' : 'status-error';
+                const icon = result.status === 'ok' ? '✅' : '❌';
+                return `
+                    <div class="status-item ${statusClass}">
+                        <span>${result.name}: ${result.message}</span>
+                        <span>${icon}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch(`${baseUrl}/version.json`, { cache: 'no-cache' });
+                const data = await response.json();
+                
+                document.getElementById('version-details').innerHTML = `
+                    <strong>版本:</strong> v${data.version}<br>
+                    <strong>代号:</strong> ${data.codename}<br>
+                    <strong>发布日期:</strong> ${data.releaseDate}<br>
+                    <strong>核心功能版本:</strong> ${data.features.core}<br>
+                    <strong>PWA版本:</strong> ${data.features.pwa}<br>
+                    <strong>双模式支持:</strong> ${data.features.dualMode}<br>
+                    <strong>浏览器兼容:</strong> Chrome ${data.compatibility.chrome}, Firefox ${data.compatibility.firefox}, Safari ${data.compatibility.safari}
+                `;
+            } catch (error) {
+                document.getElementById('version-details').innerHTML = `
+                    ❌ 无法加载版本信息: ${error.message}
+                `;
+            }
+        }
+
+        function clearCache() {
+            if ('caches' in window) {
+                caches.keys().then(names => {
+                    names.forEach(name => {
+                        caches.delete(name);
+                    });
+                    alert('缓存已清除，请刷新页面');
+                });
+            } else {
+                alert('浏览器不支持缓存API');
+            }
+        }
+
+        // 页面加载时自动检查状态
+        window.addEventListener('load', () => {
+            checkAllStatus();
+            loadVersionInfo();
+            
+            // 每30秒自动刷新一次状态
+            setInterval(() => {
+                checkAllStatus();
+                loadVersionInfo();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
