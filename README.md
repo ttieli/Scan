@@ -1,5 +1,9 @@
 # QR数据传输系统 / QR Data Transfer System
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/ttieli/Scan/releases)
+[![PWA Ready](https://img.shields.io/badge/PWA-Ready-brightgreen.svg)](https://ttieli.github.io/Scan/)
+
 通过动态二维码实现跨网络的安全数据传输。一个简单实用的二维码生成和扫描工具集。
 
 ## 🚀 在线体验
@@ -36,6 +40,28 @@
 - 震动反馈提升扫描体验
 - 扫描频率: 100ms/次
 
+## 🎯 快速开始
+
+### 在线使用（推荐）
+直接访问 [GitHub Pages](https://ttieli.github.io/Scan/) 即可使用，无需安装。
+
+### 本地部署
+```bash
+# 克隆仓库
+git clone https://github.com/ttieli/Scan.git
+cd Scan
+
+# 安装依赖（可选，仅用于开发）
+npm install
+
+# 启动本地服务器
+npm run serve
+# 或使用Python
+python -m http.server 8888
+```
+
+访问 `http://localhost:8888`
+
 ## 使用方法
 
 ### 发送端（内网）
@@ -50,16 +76,6 @@
 3. 将摄像头对准屏幕上的二维码
 4. 数据自动接收并保存
 
-### 本地使用
-```bash
-# 克隆仓库
-git clone https://github.com/ttieli/Scan.git
-
-# 使用HTTP服务器运行
-python -m http.server 8000
-# 或
-npx serve
-```
 
 ## 技术栈
 - 纯 HTML/CSS/JavaScript
@@ -116,6 +132,20 @@ Scan/
 - [贡献指南](docs/CONTRIBUTING.md) - 如何参与贡献
 - [项目结构](docs/PROJECT_STRUCTURE.md) - 代码结构说明
 
-## License
+## 🤝 贡献
 
-MIT License
+欢迎贡献代码！请查看 [贡献指南](docs/CONTRIBUTING.md)。
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- [qrcode.js](https://github.com/davidshimjs/qrcodejs) - QR码生成库
+- [jsQR](https://github.com/cozmo/jsQR) - QR码扫描库
+- 所有贡献者和用户
+
+---
+
+Made with ❤️ by [TieLi](https://github.com/ttieli)
