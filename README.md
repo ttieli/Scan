@@ -1,42 +1,64 @@
-# QR数据传输系统 - 极简离线版
+# QR数据传输系统 - 完全离线版
 
-## 简介
-完全离线的QR码数据传输系统，仅需3个HTML文件即可运行。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-brightgreen)](https://ttieli.github.io/Scan/)
 
-## 文件结构
+通过QR码实现完全离线的数据传输，仅需3个HTML文件。
+
+## 🚀 在线体验
+
+- **GitHub Pages**: https://ttieli.github.io/Scan/
+- **发送端**: https://ttieli.github.io/Scan/sender.html
+- **接收端**: https://ttieli.github.io/Scan/receiver.html
+
+## 📦 极简结构
+
 ```
-QR_Group_Scan/
-├── standalone/          # 独立版本（主要使用）
-│   ├── index.html      # 主页
-│   ├── sender.html     # 发送端
-│   └── receiver.html   # 接收端
-├── LICENSE             # MIT许可证
-└── README.md          # 本文件
+仅3个文件：
+├── index.html      # 主页（6.7KB）
+├── sender.html     # 发送端（23.5KB）
+└── receiver.html   # 接收端（254KB）
 ```
 
-## 使用方法
+## ✨ 核心特性
 
-### 快速开始
-1. 进入 `standalone` 目录
-2. 双击打开 `index.html`
-3. 选择发送端或接收端
+- 🔒 **完全离线** - 所有代码内嵌，无需网络
+- 📱 **零依赖** - 无需安装任何软件
+- 🚀 **即开即用** - 下载即可使用
+- 🌐 **跨平台** - 支持所有现代浏览器
+- 📊 **智能分片** - 自动处理长文本
 
-### 完整功能（需要本地服务器）
+## 💡 使用方法
+
+### 方式一：直接使用（仅发送）
+1. 下载3个HTML文件
+2. 双击打开 `sender.html`
+3. 输入文本，生成QR码
+
+### 方式二：完整功能（推荐）
 ```bash
-cd standalone
+# 启动本地服务器
 python3 -m http.server 8000
 # 访问 http://localhost:8000
 ```
 
-## 特性
-- ✅ 完全离线运行
-- ✅ 零外部依赖
-- ✅ 所有代码内嵌
-- ✅ 支持长文本分片
-- ✅ 平铺/循环显示模式
+### 方式三：GitHub Pages
+直接访问 https://ttieli.github.io/Scan/
 
-## 版本
-- v2.0.0 - 极简离线版
+## 📱 功能说明
 
-## 许可
-MIT License
+- **sender.html** - 生成QR码，支持平铺/循环显示
+- **receiver.html** - 扫描QR码，自动合并多片数据
+- **index.html** - 导航主页
+
+## ⚠️ 注意事项
+
+摄像头功能需要HTTPS或localhost环境（浏览器安全限制）
+
+## 📄 许可证
+
+MIT License - 自由使用
+
+---
+
+极简、安全、可靠的离线数据传输方案
