@@ -500,10 +500,10 @@
                 <div class="setting-item">
                     <label for="chunkSizeInput">
                         分片大小
-                        <span class="setting-value" id="chunkSizeDisplay">800</span> 字节
+                        <span class="setting-value" id="chunkSizeDisplay">500</span> 字节
                     </label>
-                    <input type="range" id="chunkSizeInput" min="200" max="2000" value="800" step="100">
-                    <small>每个QR码包含的最大数据量</small>
+                    <input type="range" id="chunkSizeInput" min="100" max="1500" value="500" step="50">
+                    <small>每个QR码包含的最大数据量（建议：300-800字节）</small>
                 </div>
                 
                 <div class="setting-item">
@@ -582,8 +582,16 @@
                 this.playInterval = null;
                 this.isPlaying = false;
                 
+                // QR码容量限制（近似值，包含JSON元数据）
+                this.qrCapacity = {
+                    'L': { numeric: 7089, alphanumeric: 4296, binary: 2953 },
+                    'M': { numeric: 5596, alphanumeric: 3391, binary: 2331 },
+                    'Q': { numeric: 3993, alphanumeric: 2420, binary: 1663 },
+                    'H': { numeric: 3057, alphanumeric: 1852, binary: 1273 }
+                };
+                
                 this.config = {
-                    chunkSize: 800,
+                    chunkSize: 500,  // 减小默认值以确保兼容性
                     qrSize: 200,
                     interval: 2000,
                     errorLevel: 'M'
@@ -709,11 +717,17 @@
             
             chunkText(text) {
                 const chunks = [];
+                const maxDataSize = this.config.chunkSize;
+                
+                // 预估JSON包装后的额外开销（约50-100字节）
+                const metadataOverhead = 100;
+                const effectiveChunkSize = maxDataSize - metadataOverhead;
+                
                 const encoder = new TextEncoder();
                 const bytes = encoder.encode(text);
                 
-                for (let i = 0; i < bytes.length; i += this.config.chunkSize) {
-                    const chunk = bytes.slice(i, i + this.config.chunkSize);
+                for (let i = 0; i < bytes.length; i += effectiveChunkSize) {
+                    const chunk = bytes.slice(i, Math.min(i + effectiveChunkSize, bytes.length));
                     const decoder = new TextDecoder();
                     chunks.push(decoder.decode(chunk));
                 }
@@ -813,15 +827,27 @@
                     }
                 }
                 
-                // 生成QR码
-                const qr = new QRCode(qrDiv, {
-                    text: data,
-                    width: this.config.qrSize,
-                    height: this.config.qrSize,
-                    correctLevel: QRCode.CorrectLevel[this.config.errorLevel]
-                });
-                
-                this.qrCodes.push({ element: container, qr: qr, data: data });
+                try {
+                    // 生成QR码，如果数据太大会抛出错误
+                    const qr = new QRCode(qrDiv, {
+                        text: data,
+                        width: this.config.qrSize,
+                        height: this.config.qrSize,
+                        correctLevel: QRCode.CorrectLevel[this.config.errorLevel]
+                    });
+                    
+                    this.qrCodes.push({ element: container, qr: qr, data: data });
+                } catch (error) {
+                    // 如果QR码生成失败，显示错误信息
+                    console.error(`QR码 ${index + 1} 生成失败:`, error);
+                    qrDiv.innerHTML = `<div style="color: red; padding: 20px;">数据过大<br>请减小分片大小</div>`;
+                    info.textContent = `${data.length} 字节 (超出容量)`;
+                    info.style.color = 'red';
+                    
+                    // 自动建议更小的分片大小
+                    const suggestedSize = Math.floor(this.config.chunkSize * 0.7);
+                    this.showStatus(`片段 ${index + 1} 数据过大，建议将分片大小调整为 ${suggestedSize} 字节`, 'warning');
+                }
             }
             
             regenerateQRDisplay() {
