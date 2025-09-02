@@ -28,7 +28,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="header">
         <h1>📤 QR数据发送器</h1>
         <p>完全离线版 - 无需网络连接</p>
-        <p style="color: #999; font-size: 11px; margin-top: 5px;">更新: 2025-09-02 11:33 | 每片最大: 150字符</p>
+        <p style="color: #999; font-size: 11px; margin-top: 5px;">更新: 2025-09-02 11:35 | 每片最大: 100字符</p>
     </div>
     
     <div class="section">
@@ -66,7 +66,7 @@ function generateQR() {
     display.innerHTML = '';
     
     // 分片处理 - 使用很小的分片大小以确保QR码绝对不会溢出
-    const chunks = chunkText(text, 150);
+    const chunks = chunkText(text, 100);
     qrCodes = [];
     
     chunks.forEach((chunk, index) => {
@@ -85,11 +85,20 @@ function generateQR() {
         // 确保QR码数据不超过限制
         const qrData = JSON.stringify({i: index + 1, t: chunks.length, d: chunk});
         
+        // 调试：输出实际数据长度
+        console.log(`片${index + 1}: 原始chunk长度=${chunk.length}, JSON长度=${qrData.length}`);
+        
         // 如果数据太长，进一步截断
-        const maxQRLength = 400; // 极度保守的限制，确保绝对安全
-        const finalData = qrData.length > maxQRLength 
-            ? JSON.stringify({i: index + 1, t: chunks.length, d: chunk.substring(0, chunk.length - (qrData.length - maxQRLength))})
-            : qrData;
+        const maxQRLength = 300; // 超级保守，考虑中文占3倍空间
+        let finalData = qrData;
+        
+        if (qrData.length > maxQRLength) {
+            // 计算需要截断多少字符
+            const excess = qrData.length - maxQRLength;
+            const truncatedChunk = chunk.substring(0, chunk.length - excess - 10); // 额外减10个字符以确保安全
+            finalData = JSON.stringify({i: index + 1, t: chunks.length, d: truncatedChunk});
+            console.log(`截断后: chunk长度=${truncatedChunk.length}, JSON长度=${finalData.length}`);
+        }
         
         try {
             new QRCode(qrDiv, {
@@ -100,6 +109,8 @@ function generateQR() {
             });
         } catch (e) {
             console.error('QR生成失败:', e);
+            console.error('失败的数据长度:', finalData.length);
+            console.error('失败的数据内容:', finalData);
             qrDiv.innerHTML = '<div style="color:red;">QR码生成失败，数据过长</div>';
         }
         
@@ -109,11 +120,11 @@ function generateQR() {
 
 function chunkText(text, maxSize) {
     // QR码容量限制：纠错级别M下，约可存储688字符
+    // 但是！中文等Unicode字符在QR码中会占用3倍空间
     // JSON元数据格式: {"i":1,"t":1,"d":"..."} 约需30字符
-    // 中文等Unicode字符会占用更多空间
     
-    // 极度保守：每片最多150字符，确保任何情况下都不会溢出
-    const effectiveSize = Math.min(maxSize, 150);
+    // 超级保守：每片最多100字符，即使全是中文也安全
+    const effectiveSize = Math.min(maxSize, 100);
     const chunks = [];
     
     for (let i = 0; i < text.length; i += effectiveSize) {
