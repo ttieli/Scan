@@ -16,6 +16,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .btn:hover { background: #45a049; }
 .qr-display { background: #f8f9fa; padding: 30px; border-radius: 8px; min-height: 400px; }
 .qr-display.grid-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+.qr-display.loop-mode { display: flex; justify-content: center; align-items: center; min-height: 400px; }
 .qr-item { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
 textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; min-height: 120px; font-family: inherit; }
 .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -28,7 +29,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="header">
         <h1>📤 QR数据发送器</h1>
         <p>完全离线版 - 无需网络连接</p>
-        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 20:30:00 | Base64编码支持中文 | 智能分片优化</p>
+        <p style="color: #999; font-size: 11px; margin-top: 5px;">版本: 2025-09-02 21:00:00 | Base64编码支持中文 | 循环播放功能</p>
     </div>
     
     <div class="section">
@@ -57,6 +58,8 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 // 应用代码
 let mode = 'grid';
 let qrCodes = [];
+let currentIndex = 0;
+let loopInterval = null;
 
 function generateQR() {
     const text = document.getElementById('textInput').value;
@@ -64,6 +67,7 @@ function generateQR() {
     
     const display = document.getElementById('qrDisplay');
     display.innerHTML = '';
+    qrCodes = []; // 重置QR码数组
     
     // 智能分片：根据文本长度动态调整分片大小
     let chunkSize = 15; // 默认分片大小
@@ -81,8 +85,6 @@ function generateQR() {
         const proceed = confirm(`文本较长，将生成${chunks.length}个QR码。建议缩短文本或继续？`);
         if (!proceed) return;
     }
-    
-    qrCodes = [];
     
     chunks.forEach((chunk, index) => {
         const container = document.createElement('div');
@@ -161,11 +163,53 @@ function chunkText(text, maxSize) {
 
 function setMode(newMode) {
     mode = newMode;
-    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.includes(newMode === 'grid' ? '平铺' : '循环')) {
+            btn.classList.add('active');
+        }
+    });
     
     const display = document.getElementById('qrDisplay');
     display.className = 'qr-display ' + (mode === 'grid' ? 'grid-mode' : 'loop-mode');
+    
+    // 处理循环播放
+    if (mode === 'loop') {
+        startLoop();
+    } else {
+        stopLoop();
+    }
+}
+
+function startLoop() {
+    if (qrCodes.length === 0) return;
+    
+    stopLoop(); // 清除之前的定时器
+    currentIndex = 0;
+    showQRCode(currentIndex);
+    
+    // 每2秒切换一次
+    loopInterval = setInterval(() => {
+        currentIndex = (currentIndex + 1) % qrCodes.length;
+        showQRCode(currentIndex);
+    }, 2000);
+}
+
+function stopLoop() {
+    if (loopInterval) {
+        clearInterval(loopInterval);
+        loopInterval = null;
+    }
+    // 显示所有QR码
+    qrCodes.forEach(item => {
+        item.style.display = 'block';
+    });
+}
+
+function showQRCode(index) {
+    qrCodes.forEach((item, i) => {
+        item.style.display = (i === index) ? 'block' : 'none';
+    });
 }
 </script>
 </body>
