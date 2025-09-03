@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-brightgreen)](https://ttieli.github.io/Scan/)
-[![Version](https://img.shields.io/badge/Version-2.1.0-blue)](https://github.com/ttieli/Scan)
+[![Version](https://img.shields.io/badge/Version-2.2.0-blue)](https://github.com/ttieli/Scan)
 
 通过QR码实现完全离线的数据传输，仅需3个HTML文件。
 
@@ -56,6 +56,10 @@ python3 -m http.server 8000
 - 🎯 智能分片：根据文本长度自动优化
 - 📊 两种显示模式：平铺/循环播放
 - ⚡ Base64编码确保中文兼容性
+- 🔧 可选纠错级别（L/M/Q/H）
+- 📏 分片策略控制（自动/小/中/大/超大）
+- 🎬 循环播放速度可调（1-5秒）
+- 🔍 循环模式QR码放大显示
 
 ### 接收端 (receiver.html)
 - 📷 摄像头扫描QR码
@@ -69,7 +73,13 @@ python3 -m http.server 8000
 - 🏠 快速导航到发送/接收端
 - 📖 功能介绍和使用说明
 
-## 🎯 最新更新 (v2.1.0)
+## 🎯 最新更新 (v2.2.0)
+
+### 2025-09-03
+- ✅ **高级QR选项**：可选择纠错级别（L/M/Q/H）控制数据容量
+- ✅ **分片策略控制**：提供小/中/大/超大分片选项
+- ✅ **循环播放增强**：循环模式下QR码放大1.5倍显示
+- ✅ **播放速度调节**：支持1-5秒可调播放速度
 
 ### 2025-09-02
 - ✅ **智能分片优化**：长文本自动调整分片大小，减少QR码数量
@@ -88,11 +98,17 @@ python3 -m http.server 8000
 ## 🔧 技术细节
 
 - **分片策略**：
-  - 短文本（≤500字符）：15字符/片
-  - 中文本（501-1000字符）：25字符/片
-  - 长文本（>1000字符）：动态计算，最多25片
+  - 自动模式：根据文本长度智能调整
+  - 小分片：15字符/片（适合简单扫描器）
+  - 中分片：30字符/片（平衡模式）
+  - 大分片：50字符/片（减少QR数量）
+  - 超大分片：80字符/片（最少QR数量）
 - **编码方式**：Base64编码支持中文和特殊字符
-- **QR纠错级别**：自适应（L/M级别）
+- **QR纠错级别**：
+  - L级：7%纠错，最大数据容量
+  - M级：15%纠错，标准容错
+  - Q级：25%纠错，较高容错
+  - H级：30%纠错，最高容错
 
 ## 📄 许可证
 

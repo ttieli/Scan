@@ -17,6 +17,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .qr-display { background: #f8f9fa; padding: 30px; border-radius: 8px; min-height: 400px; }
 .qr-display.grid-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
 .qr-display.loop-mode { display: flex; justify-content: center; align-items: center; min-height: 400px; }
+.qr-display.loop-mode .qr-item { transform: scale(1.5); }
+.options-panel { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px; }
+.option-group { flex: 1; min-width: 200px; }
+.option-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+.option-group select { width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 6px; }
 .qr-item { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
 textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; min-height: 120px; font-family: inherit; }
 .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -35,7 +40,37 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
     <div class="section">
         <h2>数据输入</h2>
         <textarea id="textInput" placeholder="输入要传输的文本...">Hello World! 这是完全离线的QR码传输系统。支持中文字符和长文本智能分片。</textarea>
-        <button class="btn" onclick="generateQR()">生成二维码</button>
+        <div class="options-panel">
+            <div class="option-group">
+                <label>纠错级别</label>
+                <select id="errorLevel">
+                    <option value="L" selected>L - 低 (7%纠错，数据最多)</option>
+                    <option value="M">M - 中 (15%纠错)</option>
+                    <option value="Q">Q - 较高 (25%纠错)</option>
+                    <option value="H">H - 高 (30%纠错，数据最少)</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label>分片策略</label>
+                <select id="chunkStrategy">
+                    <option value="auto" selected>自动优化</option>
+                    <option value="small">小分片 (15字符)</option>
+                    <option value="medium">中分片 (30字符)</option>
+                    <option value="large">大分片 (50字符)</option>
+                    <option value="xlarge">超大分片 (80字符)</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label>循环速度</label>
+                <select id="loopSpeed">
+                    <option value="1000">快速 (1秒)</option>
+                    <option value="2000" selected>正常 (2秒)</option>
+                    <option value="3000">慢速 (3秒)</option>
+                    <option value="5000">超慢 (5秒)</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn" onclick="generateQR()" style="margin-top: 15px;">生成二维码</button>
     </div>
     
     <div class="section">
@@ -60,6 +95,7 @@ let mode = 'grid';
 let qrCodes = [];
 let currentIndex = 0;
 let loopInterval = null;
+let loopSpeed = 2000;
 
 function generateQR() {
     const text = document.getElementById('textInput').value;
@@ -69,14 +105,39 @@ function generateQR() {
     display.innerHTML = '';
     qrCodes = []; // 重置QR码数组
     
-    // 智能分片：根据文本长度动态调整分片大小
+    // 获取用户选择的选项
+    const errorLevel = document.getElementById('errorLevel').value;
+    const chunkStrategy = document.getElementById('chunkStrategy').value;
+    loopSpeed = parseInt(document.getElementById('loopSpeed').value);
+    
+    // 根据策略确定分片大小
     let chunkSize = 15; // 默认分片大小
-    if (text.length > 1000) {
-        chunkSize = Math.min(50, Math.max(25, Math.floor(text.length / 25))); // 长文本使用更大分片，最多25片
-        console.log(`长文本优化：文本${text.length}字符，使用分片大小${chunkSize}，预计${Math.ceil(text.length / chunkSize)}片`);
-    } else if (text.length > 500) {
-        chunkSize = 25; // 中等文本使用25字符分片
+    switch(chunkStrategy) {
+        case 'small':
+            chunkSize = 15;
+            break;
+        case 'medium':
+            chunkSize = 30;
+            break;
+        case 'large':
+            chunkSize = 50;
+            break;
+        case 'xlarge':
+            chunkSize = 80;
+            break;
+        case 'auto':
+        default:
+            // 智能分片：根据文本长度动态调整分片大小
+            if (text.length > 1000) {
+                chunkSize = Math.min(50, Math.max(25, Math.floor(text.length / 25))); // 长文本使用更大分片，最多25片
+                console.log(`长文本优化：文本${text.length}字符，使用分片大小${chunkSize}，预计${Math.ceil(text.length / chunkSize)}片`);
+            } else if (text.length > 500) {
+                chunkSize = 25; // 中等文本使用25字符分片
+            }
+            break;
     }
+    
+    console.log(`分片策略: ${chunkStrategy}, 纠错级别: ${errorLevel}, 分片大小: ${chunkSize}`);
     
     const chunks = chunkText(text, chunkSize);
     
@@ -121,11 +182,22 @@ function generateQR() {
                 console.warn(`片${index + 1}数据过长(${qrData.length}字符)，强制使用L级纠错`);
             }
             
+            // 根据显示模式设置QR码大小
+            const qrSize = mode === 'loop' ? 300 : 200;
+            
+            // 根据用户选择的纠错级别设置
+            const correctLevelMap = {
+                'L': QRCode.CorrectLevel.L,
+                'M': QRCode.CorrectLevel.M,
+                'Q': QRCode.CorrectLevel.Q,
+                'H': QRCode.CorrectLevel.H
+            };
+            
             new QRCode(qrDiv, {
                 text: qrData,
-                width: 200,
-                height: 200,
-                correctLevel: QRCode.CorrectLevel.L // 使用L级纠错以减少数据量
+                width: qrSize,
+                height: qrSize,
+                correctLevel: correctLevelMap[errorLevel] || QRCode.CorrectLevel.L
             });
         } catch (e) {
             console.error('QR生成失败:', e);
@@ -143,13 +215,28 @@ function chunkText(text, maxSize) {
     // Base64编码会增加约33%的数据量，但对于大分片，我们可以适当放宽限制
     let effectiveSize = maxSize;
     
-    // 根据分片大小调整安全系数
-    if (maxSize <= 15) {
-        effectiveSize = maxSize; // 小分片保持原样
-    } else if (maxSize <= 30) {
-        effectiveSize = Math.floor(maxSize * 0.9); // 中分片减少10%
+    // 获取纠错级别以调整安全系数
+    const errorLevel = document.getElementById('errorLevel').value;
+    
+    // 根据分片大小和纠错级别调整安全系数
+    if (errorLevel === 'H') {
+        // 高纠错级别，需要更保守
+        effectiveSize = Math.floor(maxSize * 0.6);
+    } else if (errorLevel === 'Q') {
+        effectiveSize = Math.floor(maxSize * 0.7);
+    } else if (errorLevel === 'M') {
+        effectiveSize = Math.floor(maxSize * 0.8);
     } else {
-        effectiveSize = Math.floor(maxSize * 0.8); // 大分片减少20%以防QR溢出
+        // L级纠错，可以使用更多数据
+        if (maxSize <= 15) {
+            effectiveSize = maxSize; // 小分片保持原样
+        } else if (maxSize <= 30) {
+            effectiveSize = Math.floor(maxSize * 0.95); // 中分片减少5%
+        } else if (maxSize <= 50) {
+            effectiveSize = Math.floor(maxSize * 0.9); // 大分片减少10%
+        } else {
+            effectiveSize = Math.floor(maxSize * 0.85); // 超大分片减少15%以防QR溢出
+        }
     }
     
     const chunks = [];
@@ -188,11 +275,11 @@ function startLoop() {
     currentIndex = 0;
     showQRCode(currentIndex);
     
-    // 每2秒切换一次
+    // 根据用户设置的速度切换
     loopInterval = setInterval(() => {
         currentIndex = (currentIndex + 1) % qrCodes.length;
         showQRCode(currentIndex);
-    }, 2000);
+    }, loopSpeed);
 }
 
 function stopLoop() {
