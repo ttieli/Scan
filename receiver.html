@@ -214,6 +214,7 @@ body {
             <div id="chunksPreview" style="font-family: monospace; font-size: 12px; background: #f8f9fa; padding: 5px; border-radius: 4px; margin-top: 5px;"></div>
         </div>
         <div id="output">等待扫描...</div>
+        <button class="btn" id="copyBtn" onclick="copyResult()" style="display:none; margin-top: 10px; background: #007bff;">📋 复制数据</button>
         <div id="status"></div>
     </div>
 </div>
@@ -10549,6 +10550,7 @@ function scan() {
                         
                         document.getElementById('output').textContent = fullText;
                         document.getElementById('chunksList').style.display = 'none';
+                        document.getElementById('copyBtn').style.display = 'block'; // 显示复制按钮
                         
                         // 完成状态
                         updateScanProgress('✅ 扫描完成！', data.t, data.t);
@@ -10560,11 +10562,13 @@ function scan() {
                     // 不是我们格式的QR码，显示原始数据
                     console.log('非分片QR码，原始数据:', code.data);
                     document.getElementById('output').textContent = code.data;
+                    document.getElementById('copyBtn').style.display = 'block'; // 显示复制按钮
                 }
             } catch (e) {
                 // JSON解析失败，显示原始数据
                 console.log('JSON解析失败，显示原始数据:', code.data);
                 document.getElementById('output').textContent = code.data;
+                document.getElementById('copyBtn').style.display = 'block'; // 显示复制按钮
             }
         }
     }
