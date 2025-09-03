@@ -11,5 +11,9 @@ Thumbs.db
 *.bak
 *.swp
 
-# 测试文件
+# 测试文件和临时目录
 test-*.html
+temp-tests/
+*.md
+!README.md
+!LICENSE
