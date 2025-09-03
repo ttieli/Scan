@@ -37,16 +37,36 @@ body {
 }
 .btn:active { background: #45a049; }
 
+.video-container {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    margin: 10px auto;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
 #video { 
     width: 100%; 
-    max-width: 320px; /* 限制最大宽度 */
-    max-height: 240px; /* 限制最大高度 */
     height: auto;
-    border-radius: 10px; 
-    margin: 10px 0;
+    display: block;
     background: #000;
-    object-fit: cover; /* 保持比例，裁剪多余部分 */
+    object-fit: cover;
     transition: all 0.3s ease;
+}
+
+/* iOS Safari 专属样式 */
+@supports (-webkit-touch-callout: none) {
+    #video {
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .video-container {
+        max-width: 320px;
+        max-height: 240px;
+        aspect-ratio: 4/3;
+    }
 }
 
 #video.hidden {
@@ -132,28 +152,22 @@ body {
     color: #155724;
 }
 
-/* iOS Safari 特殊优化 */
-@supports (-webkit-appearance: none) {
-    .btn {
-        -webkit-appearance: none;
-        border-radius: 8px;
-    }
-    
-    #video {
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-    }
-}
 
 /* 移动端优化 */
 @media (max-width: 768px) {
     body { padding: 5px; }
     .section { padding: 12px; margin-bottom: 10px; }
     
-    #video { 
-        max-width: 280px; /* 移动端进一步限制宽度 */
-        max-height: 210px; /* 移动端进一步限制高度 */
-        object-fit: cover; 
+    .video-container {
+        max-width: 280px;
+    }
+    
+    /* iOS移动设备 */
+    @supports (-webkit-touch-callout: none) {
+        .video-container {
+            max-width: 280px;
+            max-height: 210px;
+        }
     }
     
     #video.minimized {
@@ -170,9 +184,16 @@ body {
 }
 
 @media (max-width: 480px) {
-    #video { 
-        max-width: 240px; /* 超小屏幕更小的视频尺寸 */
-        max-height: 180px; 
+    .video-container { 
+        max-width: 240px;
+    }
+    
+    /* iOS小屏设备 */
+    @supports (-webkit-touch-callout: none) {
+        .video-container {
+            max-width: 240px;
+            max-height: 180px;
+        }
     }
     
     #video.minimized {
@@ -203,7 +224,9 @@ body {
             <button onclick="normalizeVideo()">📺 正常大小</button>
         </div>
         
-        <video id="video" style="display:none;"></video>
+        <div class="video-container">
+            <video id="video" playsinline webkit-playsinline muted autoplay style="display:none;"></video>
+        </div>
         <canvas id="canvas" style="display:none;"></canvas>
     </div>
     
@@ -10378,18 +10401,41 @@ async function startScan() {
     document.getElementById('scanStatus').className = 'progress-indicator scanning-indicator';
     updateScanProgress('正在启动摄像头...', 0, 0);
     
+    // 检测iOS设备
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    // 根据设备调整配置
+    const constraints = {
+        video: {
+            facingMode: "environment",
+            width: { ideal: isIOS ? 640 : 1280 },  // iOS使用较低分辨率
+            height: { ideal: isIOS ? 480 : 720 }
+        }
+    };
+    
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } 
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         
         video.srcObject = stream;
         video.style.display = 'block';
-        video.play();
+        
+        // iOS需要特殊处理
+        if (isIOS) {
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
+            video.setAttribute('muted', 'true');
+            video.setAttribute('autoplay', 'true');
+        }
+        
+        // 确保视频播放
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.log('自动播放失败，尝试手动播放:', error);
+                // 备用：用户交互后播放
+                setTimeout(() => video.play(), 100);
+            });
+        }
         scanning = true;
         
         // 显示视频控制按钮
