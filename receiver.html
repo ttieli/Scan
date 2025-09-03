@@ -10433,6 +10433,54 @@ function resetScanUI() {
     document.getElementById('videoControls').style.display = 'none';
 }
 
+// 复制结果到剪贴板
+function copyResult() {
+    const output = document.getElementById('output');
+    const text = output.textContent;
+    
+    if (navigator.clipboard) {
+        // 现代浏览器
+        navigator.clipboard.writeText(text).then(() => {
+            // 临时改变按钮文字显示成功
+            const btn = document.getElementById('copyBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✅ 已复制！';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 2000);
+        }).catch(err => {
+            console.error('复制失败:', err);
+            fallbackCopy(text);
+        });
+    } else {
+        // 旧版浏览器备用方案
+        fallbackCopy(text);
+    }
+}
+
+// 备用复制方法
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        const btn = document.getElementById('copyBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ 已复制！';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 2000);
+    } catch (err) {
+        console.error('复制失败:', err);
+        alert('复制失败，请手动选择复制');
+    }
+    document.body.removeChild(textarea);
+}
+
 function updateScanProgress(message, received, total) {
     document.getElementById('scanProgress').textContent = message;
     document.getElementById('scanCount').textContent = `${received}/${total}`;

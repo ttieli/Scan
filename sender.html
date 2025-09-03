@@ -18,6 +18,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .qr-display.grid-mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
 .qr-display.loop-mode { display: flex; justify-content: center; align-items: center; min-height: 400px; }
 .qr-display.loop-mode .qr-item { transform: scale(1.5); }
+.qr-display.single-mode { display: flex; justify-content: center; align-items: center; min-height: 400px; }
+.qr-display.single-mode .qr-item { transform: scale(1.5); }
 .options-panel { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px; }
 .option-group { flex: 1; min-width: 200px; }
 .option-group label { display: block; margin-bottom: 5px; font-weight: 500; }
@@ -62,7 +64,7 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
             </div>
             <div class="option-group">
                 <label>循环速度</label>
-                <select id="loopSpeed">
+                <select id="loopSpeed" onchange="updateLoopSpeed()">
                     <option value="1000">快速 (1秒)</option>
                     <option value="2000" selected>正常 (2秒)</option>
                     <option value="3000">慢速 (3秒)</option>
@@ -78,6 +80,18 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
         <div class="mode-selector">
             <button class="mode-btn active" onclick="setMode('grid')">平铺显示</button>
             <button class="mode-btn" onclick="setMode('loop')">循环播放</button>
+            <button class="mode-btn" onclick="setMode('single')">单张显示</button>
+        </div>
+        <div id="singleControls" style="display:none; margin-top: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button onclick="previousQR()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;">⬅ 上一张</button>
+                <span id="qrIndex" style="flex: 1; text-align: center; font-weight: bold;">1 / 1</span>
+                <button onclick="nextQR()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer;">下一张 ➡</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <label style="display: block; margin-bottom: 5px;">直接跳转到：</label>
+                <select id="qrSelector" onchange="jumpToQR()" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 6px;"></select>
+            </div>
         </div>
     </div>
     
@@ -208,6 +222,14 @@ function generateQR() {
         
         qrCodes.push(container);
     });
+    
+    // 如果当前是单张模式，更新选择器
+    if (mode === 'single') {
+        updateSingleModeSelector();
+        showQRCode(0);
+        currentIndex = 0;
+        updateQRIndex();
+    }
 }
 
 function chunkText(text, maxSize) {
@@ -252,19 +274,34 @@ function setMode(newMode) {
     mode = newMode;
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent.includes(newMode === 'grid' ? '平铺' : '循环')) {
+        const btnText = btn.textContent;
+        if ((newMode === 'grid' && btnText.includes('平铺')) ||
+            (newMode === 'loop' && btnText.includes('循环')) ||
+            (newMode === 'single' && btnText.includes('单张'))) {
             btn.classList.add('active');
         }
     });
     
     const display = document.getElementById('qrDisplay');
-    display.className = 'qr-display ' + (mode === 'grid' ? 'grid-mode' : 'loop-mode');
+    const singleControls = document.getElementById('singleControls');
     
-    // 处理循环播放
-    if (mode === 'loop') {
-        startLoop();
-    } else {
+    // 设置显示类名
+    if (mode === 'grid') {
+        display.className = 'qr-display grid-mode';
+        singleControls.style.display = 'none';
         stopLoop();
+        showAllQRCodes();
+    } else if (mode === 'loop') {
+        display.className = 'qr-display loop-mode';
+        singleControls.style.display = 'none';
+        startLoop();
+    } else if (mode === 'single') {
+        display.className = 'qr-display single-mode';
+        singleControls.style.display = 'block';
+        stopLoop();
+        updateSingleModeSelector();
+        showQRCode(currentIndex);
+        updateQRIndex();
     }
 }
 
@@ -297,6 +334,67 @@ function showQRCode(index) {
     qrCodes.forEach((item, i) => {
         item.style.display = (i === index) ? 'block' : 'none';
     });
+}
+
+function showAllQRCodes() {
+    qrCodes.forEach(item => {
+        item.style.display = 'block';
+    });
+}
+
+// 单张模式控制函数
+function previousQR() {
+    if (qrCodes.length === 0) return;
+    currentIndex = (currentIndex - 1 + qrCodes.length) % qrCodes.length;
+    showQRCode(currentIndex);
+    updateQRIndex();
+    document.getElementById('qrSelector').value = currentIndex;
+}
+
+function nextQR() {
+    if (qrCodes.length === 0) return;
+    currentIndex = (currentIndex + 1) % qrCodes.length;
+    showQRCode(currentIndex);
+    updateQRIndex();
+    document.getElementById('qrSelector').value = currentIndex;
+}
+
+function jumpToQR() {
+    const selector = document.getElementById('qrSelector');
+    currentIndex = parseInt(selector.value);
+    showQRCode(currentIndex);
+    updateQRIndex();
+}
+
+function updateQRIndex() {
+    const indexDisplay = document.getElementById('qrIndex');
+    if (qrCodes.length > 0) {
+        indexDisplay.textContent = `${currentIndex + 1} / ${qrCodes.length}`;
+    } else {
+        indexDisplay.textContent = '0 / 0';
+    }
+}
+
+function updateSingleModeSelector() {
+    const selector = document.getElementById('qrSelector');
+    selector.innerHTML = '';
+    for (let i = 0; i < qrCodes.length; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = `第 ${i + 1} 张 / 共 ${qrCodes.length} 张`;
+        selector.appendChild(option);
+    }
+    selector.value = currentIndex;
+}
+
+// 即时更新循环速度
+function updateLoopSpeed() {
+    loopSpeed = parseInt(document.getElementById('loopSpeed').value);
+    if (mode === 'loop' && loopInterval) {
+        // 重启循环以应用新速度
+        stopLoop();
+        startLoop();
+    }
 }
 </script>
 </body>
