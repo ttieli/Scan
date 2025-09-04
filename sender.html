@@ -97,6 +97,33 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
                 <select id="qrSelector" onchange="jumpToQR()" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 6px;"></select>
             </div>
         </div>
+        <div id="loopControls" style="display:none; margin-top: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <button id="pauseBtn" onclick="togglePause()" style="padding: 8px 20px; background: #ff9800; color: white; border: none; border-radius: 6px; cursor: pointer;">⏸ 暂停</button>
+                <span id="loopStatus" style="flex: 1; text-align: center; font-weight: bold; color: #4CAF50;">▶ 播放中</span>
+                <span id="loopQrIndex" style="font-weight: bold;">1 / 1</span>
+            </div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 500;">循环范围设置：</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; color: #666;">起始片：</label>
+                        <input type="number" id="loopStart" min="1" value="1" onchange="updateLoopRange()" 
+                               style="width: 100%; padding: 6px; border: 2px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <span style="padding: 0 5px;">至</span>
+                    <div style="flex: 1;">
+                        <label style="font-size: 12px; color: #666;">结束片：</label>
+                        <input type="number" id="loopEnd" min="1" value="1" onchange="updateLoopRange()" 
+                               style="width: 100%; padding: 6px; border: 2px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <button onclick="resetLoopRange()" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap;">重置</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #666;">
+                    提示：可设置循环范围，如 4-50 表示只循环第4片到第50片
+                </div>
+            </div>
+        </div>
     </div>
     
     <div class="section">
@@ -227,6 +254,12 @@ function generateQR() {
         qrCodes.push(container);
     });
     
+    // 初始化循环范围控制
+    loopStart = 1;
+    loopEnd = chunks.length;
+    document.getElementById('loopStart').value = loopStart;
+    document.getElementById('loopEnd').value = loopEnd;
+    
     // 如果当前是单张模式，更新选择器
     if (mode === 'single') {
         updateSingleModeSelector();
@@ -290,20 +323,30 @@ function setMode(newMode) {
     
     const display = document.getElementById('qrDisplay');
     const singleControls = document.getElementById('singleControls');
+    const loopControls = document.getElementById('loopControls');
     
     // 设置显示类名
     if (mode === 'grid') {
         display.className = 'qr-display grid-mode';
         singleControls.style.display = 'none';
+        loopControls.style.display = 'none';
         stopLoop();
         showAllQRCodes();
     } else if (mode === 'loop') {
         display.className = 'qr-display loop-mode';
         singleControls.style.display = 'none';
+        loopControls.style.display = 'block';
+        // 重置暂停状态
+        isPaused = false;
+        document.getElementById('pauseBtn').textContent = '⏸ 暂停';
+        document.getElementById('pauseBtn').style.background = '#ff9800';
+        document.getElementById('loopStatus').textContent = '▶ 播放中';
+        document.getElementById('loopStatus').style.color = '#4CAF50';
         startLoop();
     } else if (mode === 'single') {
         display.className = 'qr-display single-mode';
         singleControls.style.display = 'block';
+        loopControls.style.display = 'none';
         stopLoop();
         updateSingleModeSelector();
         showQRCode(currentIndex);
@@ -315,13 +358,21 @@ function startLoop() {
     if (qrCodes.length === 0) return;
     
     stopLoop(); // 清除之前的定时器
-    currentIndex = 0;
-    showQRCode(currentIndex);
     
-    // 根据用户设置的速度切换
+    // 设置循环起始位置（转换为0基索引）
+    currentIndex = Math.max(0, loopStart - 1);
+    showQRCode(currentIndex);
+    updateLoopDisplay();
+    
+    // 根据用户设置的速度切换，只在指定范围内循环
     loopInterval = setInterval(() => {
-        currentIndex = (currentIndex + 1) % qrCodes.length;
+        currentIndex++;
+        // 如果超过结束位置，回到起始位置
+        if (currentIndex >= loopEnd) {
+            currentIndex = loopStart - 1; // 转换为0基索引
+        }
         showQRCode(currentIndex);
+        updateLoopDisplay();
     }, loopSpeed);
 }
 
@@ -400,6 +451,95 @@ function updateLoopSpeed() {
         // 重启循环以应用新速度
         stopLoop();
         startLoop();
+    }
+}
+
+// 循环控制相关变量
+let isPaused = false;
+let loopStart = 1;
+let loopEnd = 1;
+
+// 暂停/恢复循环播放
+function togglePause() {
+    if (!loopInterval && mode !== 'loop') return;
+    
+    const pauseBtn = document.getElementById('pauseBtn');
+    const loopStatus = document.getElementById('loopStatus');
+    
+    if (isPaused) {
+        // 恢复播放
+        isPaused = false;
+        pauseBtn.textContent = '⏸ 暂停';
+        pauseBtn.style.background = '#ff9800';
+        loopStatus.textContent = '▶ 播放中';
+        loopStatus.style.color = '#4CAF50';
+        startLoop();
+    } else {
+        // 暂停播放
+        isPaused = true;
+        pauseBtn.textContent = '▶ 播放';
+        pauseBtn.style.background = '#4CAF50';
+        loopStatus.textContent = '⏸ 已暂停';
+        loopStatus.style.color = '#ff9800';
+        stopLoop();
+    }
+}
+
+// 更新循环范围设置
+function updateLoopRange() {
+    const startInput = document.getElementById('loopStart');
+    const endInput = document.getElementById('loopEnd');
+    
+    let start = parseInt(startInput.value);
+    let end = parseInt(endInput.value);
+    
+    // 边界检查
+    if (start < 1) start = 1;
+    if (end < start) end = start;
+    if (start > qrCodes.length) start = qrCodes.length;
+    if (end > qrCodes.length) end = qrCodes.length;
+    
+    // 更新输入框显示
+    startInput.value = start;
+    endInput.value = end;
+    
+    // 更新全局变量
+    loopStart = start;
+    loopEnd = end;
+    
+    // 如果当前正在循环播放，重启循环以应用新范围
+    if (mode === 'loop' && !isPaused) {
+        stopLoop();
+        startLoop();
+    }
+    
+    console.log(`循环范围已更新: 第${loopStart}片 到 第${loopEnd}片`);
+}
+
+// 重置循环范围到全部
+function resetLoopRange() {
+    if (qrCodes.length === 0) return;
+    
+    document.getElementById('loopStart').value = 1;
+    document.getElementById('loopEnd').value = qrCodes.length;
+    
+    loopStart = 1;
+    loopEnd = qrCodes.length;
+    
+    // 如果当前正在循环播放，重启循环
+    if (mode === 'loop' && !isPaused) {
+        stopLoop();
+        startLoop();
+    }
+    
+    console.log(`循环范围已重置: 第1片 到 第${qrCodes.length}片`);
+}
+
+// 更新循环显示信息
+function updateLoopDisplay() {
+    const loopQrIndex = document.getElementById('loopQrIndex');
+    if (loopQrIndex && qrCodes.length > 0) {
+        loopQrIndex.textContent = `${currentIndex + 1} / ${qrCodes.length}`;
     }
 }
 </script>
