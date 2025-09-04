@@ -95,10 +95,10 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
             <div class="option-group">
                 <label>分片大小</label>
                 <select id="chunkSize">
-                    <option value="100">100 字节</option>
-                    <option value="200" selected>200 字节</option>
-                    <option value="500">500 字节</option>
-                    <option value="1000">1000 字节</option>
+                    <option value="50">50 字节（安全）</option>
+                    <option value="100" selected>100 字节（推荐）</option>
+                    <option value="150">150 字节</option>
+                    <option value="200">200 字节（可能过大）</option>
                 </select>
             </div>
             <div class="option-group">
@@ -333,6 +333,14 @@ async function generateQR() {
         const qrData = JSON.stringify(protocol);
         
         try {
+            // 检查数据长度是否超出QR码容量
+            if (qrData.length > 2900) { // 为QRCode Version 40留余地
+                console.warn(`分片 ${index + 1} 数据过长: ${qrData.length} 字节`);
+                // 如果太长，尝试分割成更小的片
+                qrDiv.innerHTML = '<div style="color:orange;">数据过长，请减小分片大小</div>';
+                continue;
+            }
+            
             const correctLevelMap = {
                 'L': QRCode.CorrectLevel.L,
                 'M': QRCode.CorrectLevel.M,
@@ -344,7 +352,8 @@ async function generateQR() {
                 text: qrData,
                 width: mode === 'loop' ? 300 : 200,
                 height: mode === 'loop' ? 300 : 200,
-                correctLevel: correctLevelMap[errorLevel] || QRCode.CorrectLevel.L
+                correctLevel: correctLevelMap[errorLevel] || QRCode.CorrectLevel.L,
+                typeNumber: 0 // 自动选择合适的版本
             });
             
             qrCodes.push(container);
@@ -352,8 +361,9 @@ async function generateQR() {
             // 更新进度
             updateProgress(index + 1, chunks.length);
         } catch (e) {
-            console.error('QR生成失败:', e);
-            qrDiv.innerHTML = '<div style="color:red;">QR码生成失败</div>';
+            console.error(`QR生成失败 (分片 ${index + 1}):`, e);
+            console.error(`数据长度: ${qrData.length} 字节`);
+            qrDiv.innerHTML = `<div style="color:red;">QR码生成失败<br>数据长度: ${qrData.length}</div>`;
         }
     });
     
@@ -387,8 +397,12 @@ function arrayBufferToBase64(buffer) {
 
 function createChunks(data, chunkSize) {
     const chunks = [];
-    for (let i = 0; i < data.length; i += chunkSize) {
-        chunks.push(data.slice(i, i + chunkSize));
+    // 考虑协议开销，实际数据要更小
+    const protocolOverhead = 150; // 预留给协议头的空间
+    const effectiveChunkSize = Math.max(30, chunkSize - protocolOverhead);
+    
+    for (let i = 0; i < data.length; i += effectiveChunkSize) {
+        chunks.push(data.slice(i, i + effectiveChunkSize));
     }
     return chunks;
 }
