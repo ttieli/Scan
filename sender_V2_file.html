@@ -417,6 +417,19 @@ async function generateQR() {
         // 特别处理第一片元数据
         if (index === 0 && dataType === 'file') {
             // 元数据片需要更高版本（最低V10）
+            
+            // 根据纠错级别设置maxLength（修复元数据片maxLength为0的问题）
+            if (errorLevel === 'L') {
+                maxLength = 2953; // Version 40, Level L
+            } else if (errorLevel === 'M') {
+                maxLength = 2331; // Version 40, Level M
+            } else if (errorLevel === 'Q') {
+                maxLength = 1663; // Version 40, Level Q
+            } else {
+                maxLength = 1273; // Version 40, Level H
+            }
+            
+            // 设置typeNumber（保持原有逻辑）
             if (qrDataLength < 30) typeNumber = 10;
             else if (qrDataLength < 60) typeNumber = 15;
             else if (qrDataLength < 100) typeNumber = 20;
