@@ -253,15 +253,17 @@ function chunkText(text, maxSize) {
     } else if (errorLevel === 'M') {
         effectiveSize = Math.floor(maxSize * 0.8);
     } else {
-        // L级纠错，使用更保守的缩减系数以确保兼容性
+        // L级纠错，针对不同大小采用不同策略
         if (maxSize <= 15) {
             effectiveSize = maxSize; // 小分片保持原样
         } else if (maxSize <= 30) {
-            effectiveSize = Math.floor(maxSize * 0.85); // 中分片减少15%（原5%）
+            effectiveSize = Math.floor(maxSize * 0.85); // 中分片减少15%
         } else if (maxSize <= 50) {
-            effectiveSize = Math.floor(maxSize * 0.7); // 大分片减少30%（原10%）
+            effectiveSize = Math.floor(maxSize * 0.75); // 大分片减少25%
+        } else if (maxSize <= 80) {
+            effectiveSize = Math.floor(maxSize * 0.65); // 超大分片减少35%，平衡片数和稳定性
         } else {
-            effectiveSize = Math.floor(maxSize * 0.5); // 超大分片减少50%（原15%）确保中文兼容
+            effectiveSize = Math.floor(maxSize * 0.6); // 更大分片减少40%
         }
     }
     
