@@ -760,8 +760,13 @@ function handleV2Protocol(data) {
         document.getElementById('dataType').textContent = dataType === 'file' ? '文件' : '文本';
     }
     
+    // 如果是文件的第一片，记录元数据标记
+    if (data.meta) {
+        chunks.hasMetadata = true;
+    }
+    
     // 更新进度
-    const receivedCount = Object.keys(chunks).length;
+    const receivedCount = Object.keys(chunks).length - (chunks.hasMetadata ? 1 : 0); // 减去元数据标记
     updateProgress(receivedCount, totalChunks);
     
     // 检查是否接收完成
@@ -834,23 +839,64 @@ function assembleTextData() {
 
 // 组装文件数据
 function assembleFileData() {
-    let result = '';
+    // 新的分片策略：第一片包含元数据，后续片是纯Base64数据
+    let base64Data = '';
+    let metadata = null;
+    
     for (let i = 1; i <= totalChunks; i++) {
         if (chunks[i]) {
-            result += chunks[i];
+            if (i === 1) {
+                // 第一片包含元数据和第一个数据片段
+                try {
+                    const firstChunk = JSON.parse(chunks[i]);
+                    if (firstChunk.type === 'file' && firstChunk.metadata && firstChunk.dataChunk) {
+                        metadata = firstChunk.metadata;
+                        base64Data += firstChunk.dataChunk;
+                    } else {
+                        // 兼容旧格式：整个文件数据在JSON中
+                        if (firstChunk.type === 'file' && firstChunk.metadata && firstChunk.data) {
+                            fileMetadata = firstChunk.metadata;
+                            receivedData = firstChunk.data;
+                            displayFile();
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    // 如果解析失败，可能是旧格式，尝试组合所有片段
+                    base64Data += chunks[i];
+                }
+            } else {
+                // 后续片是纯Base64数据
+                base64Data += chunks[i];
+            }
         }
     }
     
-    try {
-        const parsed = JSON.parse(result);
-        if (parsed.type === 'file' && parsed.metadata && parsed.data) {
-            fileMetadata = parsed.metadata;
-            receivedData = parsed.data;
-            displayFile();
+    // 如果成功获取元数据和数据
+    if (metadata && base64Data) {
+        fileMetadata = metadata;
+        receivedData = base64Data;
+        displayFile();
+    } else {
+        // 尝试作为旧格式处理（整个JSON被分片）
+        let result = '';
+        for (let i = 1; i <= totalChunks; i++) {
+            if (chunks[i]) {
+                result += chunks[i];
+            }
         }
-    } catch (e) {
-        console.error('解析文件数据失败:', e);
-        updateStatus('文件数据解析失败', 'error');
+        
+        try {
+            const parsed = JSON.parse(result);
+            if (parsed.type === 'file' && parsed.metadata && parsed.data) {
+                fileMetadata = parsed.metadata;
+                receivedData = parsed.data;
+                displayFile();
+            }
+        } catch (e) {
+            console.error('解析文件数据失败:', e);
+            updateStatus('文件数据解析失败', 'error');
+        }
     }
 }
 
