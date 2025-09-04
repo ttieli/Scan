@@ -311,20 +311,25 @@ async function generateQR() {
         // 文件模式：只分片Base64数据
         const dataChunks = createChunks(base64Data, chunkSize);
         
-        // 第一个分片包含元数据
-        chunks = dataChunks.map((chunk, index) => {
-            if (index === 0) {
-                // 第一片：包含元数据和第一个数据片段
-                return JSON.stringify({
-                    type: 'file',
-                    metadata: fileMetadata,
-                    dataChunk: chunk,
-                    isFirst: true
-                });
-            } else {
-                // 后续片：只包含数据
-                return chunk;
-            }
+        // 创建精简的元数据（减少大小）
+        const simplifiedMetadata = {
+            n: fileMetadata.name,  // name简化为n
+            s: fileMetadata.size,  // size简化为s
+            t: fileMetadata.type.split('/')[1] || 'bin'  // 只保留类型后缀
+        };
+        
+        // 元数据作为第一片，单独处理
+        chunks = [];
+        
+        // 第一片：只包含元数据（尽可能小）
+        chunks.push(JSON.stringify({
+            f: 1,  // file flag
+            m: simplifiedMetadata  // metadata
+        }));
+        
+        // 后续片：纯Base64数据
+        dataChunks.forEach(chunk => {
+            chunks.push(chunk);
         });
         
         dataType = 'file';

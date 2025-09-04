@@ -846,23 +846,35 @@ function assembleFileData() {
     for (let i = 1; i <= totalChunks; i++) {
         if (chunks[i]) {
             if (i === 1) {
-                // 第一片包含元数据和第一个数据片段
+                // 第一片应该包含元数据
                 try {
                     const firstChunk = JSON.parse(chunks[i]);
+                    
+                    // 新的精简格式
+                    if (firstChunk.f === 1 && firstChunk.m) {
+                        // 恢复完整的元数据格式
+                        metadata = {
+                            name: firstChunk.m.n,
+                            size: firstChunk.m.s,
+                            type: firstChunk.m.t.includes('/') ? firstChunk.m.t : `application/${firstChunk.m.t}`,
+                            lastModified: Date.now()  // 使用当前时间
+                        };
+                        continue;  // 跳过第一片，它只包含元数据
+                    }
+                    
+                    // 兼容之前的格式
                     if (firstChunk.type === 'file' && firstChunk.metadata && firstChunk.dataChunk) {
                         metadata = firstChunk.metadata;
                         base64Data += firstChunk.dataChunk;
-                    } else {
+                    } else if (firstChunk.type === 'file' && firstChunk.metadata && firstChunk.data) {
                         // 兼容旧格式：整个文件数据在JSON中
-                        if (firstChunk.type === 'file' && firstChunk.metadata && firstChunk.data) {
-                            fileMetadata = firstChunk.metadata;
-                            receivedData = firstChunk.data;
-                            displayFile();
-                            return;
-                        }
+                        fileMetadata = firstChunk.metadata;
+                        receivedData = firstChunk.data;
+                        displayFile();
+                        return;
                     }
                 } catch (e) {
-                    // 如果解析失败，可能是旧格式，尝试组合所有片段
+                    // 如果解析失败，可能是旧格式，当作数据片段处理
                     base64Data += chunks[i];
                 }
             } else {
