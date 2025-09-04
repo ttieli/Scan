@@ -396,9 +396,10 @@ async function generateQR() {
             console.log('协议封装后长度:', qrData.length);
         }
         
-        // 估算QR码容量
+        // 估算QR码容量和版本
         const qrDataLength = qrData.length;
         let maxLength = 0;
+        let typeNumber = 10; // 默认使用版本10
         
         // 根据纠错级别和数据长度选择合适的参数
         const correctLevelMap = {
@@ -411,19 +412,53 @@ async function generateQR() {
         const errorLevel = document.getElementById('errorLevel').value;
         const correctLevel = correctLevelMap[errorLevel] || QRCode.CorrectLevel.L;
         
-        // 简化版本选择，让QRCode库自动选择合适的版本
-        // 只检查是否超出最大容量
+        // 根据数据长度显式选择QR码版本
         if (errorLevel === 'L') {
             maxLength = 2953; // Version 40, Level L
+            // 根据数据长度选择合适的版本
+            if (qrDataLength < 77) typeNumber = 4;
+            else if (qrDataLength < 152) typeNumber = 7;
+            else if (qrDataLength < 272) typeNumber = 10;
+            else if (qrDataLength < 440) typeNumber = 15;
+            else if (qrDataLength < 640) typeNumber = 20;
+            else if (qrDataLength < 864) typeNumber = 25;
+            else if (qrDataLength < 1088) typeNumber = 30;
+            else if (qrDataLength < 1248) typeNumber = 35;
+            else typeNumber = 40;
         } else if (errorLevel === 'M') {
             maxLength = 2331; // Version 40, Level M
+            if (qrDataLength < 63) typeNumber = 4;
+            else if (qrDataLength < 128) typeNumber = 7;
+            else if (qrDataLength < 224) typeNumber = 10;
+            else if (qrDataLength < 352) typeNumber = 15;
+            else if (qrDataLength < 512) typeNumber = 20;
+            else if (qrDataLength < 688) typeNumber = 25;
+            else if (qrDataLength < 864) typeNumber = 30;
+            else if (qrDataLength < 992) typeNumber = 35;
+            else typeNumber = 40;
         } else if (errorLevel === 'Q') {
             maxLength = 1663; // Version 40, Level Q
+            if (qrDataLength < 47) typeNumber = 4;
+            else if (qrDataLength < 87) typeNumber = 7;
+            else if (qrDataLength < 154) typeNumber = 10;
+            else if (qrDataLength < 251) typeNumber = 15;
+            else if (qrDataLength < 364) typeNumber = 20;
+            else if (qrDataLength < 488) typeNumber = 25;
+            else if (qrDataLength < 608) typeNumber = 30;
+            else if (qrDataLength < 704) typeNumber = 35;
+            else typeNumber = 40;
         } else {
             maxLength = 1273; // Version 40, Level H
+            if (qrDataLength < 34) typeNumber = 4;
+            else if (qrDataLength < 67) typeNumber = 7;
+            else if (qrDataLength < 119) typeNumber = 10;
+            else if (qrDataLength < 191) typeNumber = 15;
+            else if (qrDataLength < 279) typeNumber = 20;
+            else if (qrDataLength < 376) typeNumber = 25;
+            else if (qrDataLength < 470) typeNumber = 30;
+            else if (qrDataLength < 542) typeNumber = 35;
+            else typeNumber = 40;
         }
-        
-        // 版本将由QRCode库自动选择
         
         try {
             // 检查数据长度是否超出最大容量
@@ -437,8 +472,8 @@ async function generateQR() {
                 text: qrData,
                 width: mode === 'loop' ? 300 : 200,
                 height: mode === 'loop' ? 300 : 200,
-                correctLevel: correctLevel
-                // 不设置typeNumber，让库自动选择
+                correctLevel: correctLevel,
+                typeNumber: typeNumber  // 显式设置typeNumber
             });
             
             qrCodes.push(container);
