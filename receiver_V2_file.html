@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR接收端 - 文件传输版</title>
+<style>
+/* 样式 */
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+    margin: 0; 
+    padding: 10px; 
+    background: #f5f5f5; 
+    -webkit-text-size-adjust: 100%;
+}
+.container { 
+    max-width: 800px; 
+    margin: 0 auto; 
+}
+.section { 
+    background: white; 
+    padding: 15px; 
+    margin-bottom: 15px; 
+    border-radius: 10px; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.btn { 
+    background: #4CAF50; 
+    color: white; 
+    border: none; 
+    padding: 12px 24px; 
+    border-radius: 6px; 
+    cursor: pointer; 
+    font-size: 16px;
+    width: 100%;
+    margin-bottom: 10px;
+}
+.btn:active { background: #45a049; }
+.btn-secondary {
+    background: #6c757d;
+}
+.btn-secondary:active { background: #5a6268; }
+.btn-danger {
+    background: #dc3545;
+}
+.btn-danger:active { background: #c82333; }
+
+.video-container {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    margin: 10px auto;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+#video { 
+    width: 100%; 
+    height: auto;
+    display: block;
+    background: #000;
+    object-fit: cover;
+    transition: all 0.3s ease;
+}
+
+/* iOS Safari 专属样式 */
+@supports (-webkit-touch-callout: none) {
+    #video {
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    .video-container {
+        max-width: 320px;
+        max-height: 240px;
+        aspect-ratio: 4/3;
+    }
+}
+
+#video.hidden {
+    display: none !important;
+}
+
+#video.minimized {
+    max-width: 200px;
+    max-height: 150px;
+    opacity: 0.8;
+}
+
+.video-controls {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.video-controls button {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 80px;
+}
+
+.video-controls button:active { background: #5a6268; }
+
+#canvas {
+    display: none;
+    border: 2px dashed #ccc;
+}
+
+.status {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 10px 0;
+    font-family: 'Courier New', monospace;
+}
+
+.status.success { background: #d4edda; color: #155724; }
+.status.error { background: #f8d7da; color: #721c24; }
+.status.warning { background: #fff3cd; color: #856404; }
+
+.progress {
+    background: #e0e0e0;
+    border-radius: 10px;
+    padding: 3px;
+    margin: 10px 0;
+    height: 30px;
+}
+
+.progress-bar {
+    background: #4CAF50;
+    height: 24px;
+    border-radius: 8px;
+    transition: width 0.3s;
+    text-align: center;
+    line-height: 24px;
+    color: white;
+    font-size: 12px;
+}
+
+#result {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    min-height: 100px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+}
+
+.chunk-info {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin: 10px 0;
+}
+
+.chunk-info span {
+    font-size: 14px;
+    color: #666;
+}
+
+.file-info {
+    background: #e7f5ff;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    border: 1px solid #74c0fc;
+}
+
+.file-info h3 {
+    margin-top: 0;
+    color: #1864ab;
+}
+
+.file-info p {
+    margin: 5px 0;
+    color: #495057;
+}
+
+.download-section {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 20px;
+    border: 2px dashed #6c757d;
+}
+
+.download-section.ready {
+    background: #d1f4e0;
+    border-color: #4CAF50;
+}
+
+.download-btn {
+    display: inline-block;
+    padding: 15px 30px;
+    background: #28a745;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.download-btn:hover {
+    background: #218838;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.tab {
+    flex: 1;
+    padding: 10px;
+    background: #e0e0e0;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    text-align: center;
+}
+
+.tab.active {
+    background: white;
+    border-bottom: 2px solid #4CAF50;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.stat-item {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #666;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 5px;
+    }
+    
+    .section {
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .btn {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+    
+    .video-container {
+        max-width: 100%;
+    }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="section">
+        <h2>📥 QR接收器 - 文件传输版</h2>
+        <p>支持文本和文件接收</p>
+        <p style="font-size: 11px; color: #999;">版本: 2025-09-04 | 支持二进制文件传输</p>
+    </div>
+
+    <div class="section">
+        <h3>摄像头扫描</h3>
+        
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+        
+        <div class="video-controls">
+            <button onclick="toggleCamera()">切换摄像头</button>
+            <button onclick="toggleSize()">调整大小</button>
+            <button onclick="toggleVideo()">隐藏/显示</button>
+        </div>
+        
+        <canvas id="canvas"></canvas>
+        
+        <button class="btn" onclick="startScanning()" id="startBtn">开始扫描</button>
+        <button class="btn btn-danger" onclick="stopScanning()" id="stopBtn" style="display:none;">停止扫描</button>
+        <button class="btn btn-secondary" onclick="clearData()" id="clearBtn">清空数据</button>
+    </div>
+
+    <div class="section">
+        <h3>传输状态</h3>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">数据类型</div>
+                <div class="stat-value" id="dataType">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">接收进度</div>
+                <div class="stat-value" id="progress">0%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">分片数量</div>
+                <div class="stat-value" id="chunkCount">0/0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">总大小</div>
+                <div class="stat-value" id="totalSize">-</div>
+            </div>
+        </div>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+        </div>
+        <div id="status" class="status">等待扫描...</div>
+    </div>
+
+    <div class="section" id="textSection" style="display: none;">
+        <h3>接收的文本</h3>
+        <div id="result"></div>
+        <button class="btn btn-secondary" onclick="copyText()" style="margin-top: 10px;">复制文本</button>
+    </div>
+
+    <div class="section" id="fileSection" style="display: none;">
+        <h3>接收的文件</h3>
+        <div class="file-info" id="fileInfo" style="display: none;">
+            <h3>文件信息</h3>
+            <p id="fileName">文件名: -</p>
+            <p id="fileSize">大小: -</p>
+            <p id="fileType">类型: -</p>
+            <p id="fileModified">修改时间: -</p>
+        </div>
+        <div class="download-section" id="downloadSection" style="display: none;">
+            <h3>文件准备就绪</h3>
+            <p>点击下方按钮下载文件</p>
+            <a id="downloadLink" class="download-btn" download>下载文件</a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>调试信息</h3>
+        <div class="chunk-info">
+            <span>已接收: <strong id="receivedChunks">0</strong></span>
+            <span>总分片: <strong id="totalChunks">0</strong></span>
+            <span>扫描速度: <strong id="scanSpeed">0</strong> 片/秒</span>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+<script>
+// 如果CDN失败，使用本地备份
+if (typeof jsQR === 'undefined') {
+    console.error('jsQR库加载失败，请确保网络连接或使用本地版本');
+    // 这里可以添加本地jsQR库的内嵌版本
+}
+
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let scanning = false;
+let chunks = {};
+let totalChunks = 0;
+let scanCount = 0;
+let lastScanTime = Date.now();
+let currentCameraIndex = 0;
+let cameras = [];
+let receivedData = null;
+let fileMetadata = null;
+let dataType = 'text';
+
+// 初始化摄像头
+async function initCamera() {
+    try {
+        // 获取所有摄像头
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        cameras = devices.filter(device => device.kind === 'videoinput');
+        
+        if (cameras.length === 0) {
+            throw new Error('没有找到摄像头');
+        }
+        
+        // 启动默认摄像头
+        await switchCamera(0);
+        
+        updateStatus('摄像头已就绪', 'success');
+    } catch (err) {
+        console.error('摄像头初始化失败:', err);
+        updateStatus('摄像头初始化失败: ' + err.message, 'error');
+    }
+}
+
+// 切换摄像头
+async function switchCamera(index) {
+    if (cameras.length === 0) return;
+    
+    currentCameraIndex = index % cameras.length;
+    
+    const constraints = {
+        video: {
+            deviceId: { exact: cameras[currentCameraIndex].deviceId },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+        }
+    };
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        
+        // 等待视频元数据加载
+        await new Promise(resolve => {
+            video.onloadedmetadata = resolve;
+        });
+        
+        // 设置canvas尺寸
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+    } catch (err) {
+        console.error('切换摄像头失败:', err);
+        updateStatus('切换摄像头失败', 'error');
+    }
+}
+
+// 切换摄像头按钮
+function toggleCamera() {
+    switchCamera(currentCameraIndex + 1);
+}
+
+// 切换视频大小
+function toggleSize() {
+    video.classList.toggle('minimized');
+}
+
+// 显示/隐藏视频
+function toggleVideo() {
+    video.classList.toggle('hidden');
+}
+
+// 开始扫描
+function startScanning() {
+    if (!video.srcObject) {
+        initCamera().then(() => {
+            startScanning();
+        });
+        return;
+    }
+    
+    scanning = true;
+    chunks = {};
+    totalChunks = 0;
+    receivedData = null;
+    fileMetadata = null;
+    
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'block';
+    
+    updateStatus('扫描中...', 'warning');
+    scanQRCode();
+}
+
+// 停止扫描
+function stopScanning() {
+    scanning = false;
+    document.getElementById('startBtn').style.display = 'block';
+    document.getElementById('stopBtn').style.display = 'none';
+    
+    updateStatus('扫描已停止', 'success');
+}
+
+// 扫描QR码
+function scanQRCode() {
+    if (!scanning) return;
+    
+    // 确保视频已准备好
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+        });
+        
+        if (code) {
+            processQRCode(code.data);
+            
+            // 计算扫描速度
+            scanCount++;
+            const now = Date.now();
+            if (now - lastScanTime > 1000) {
+                document.getElementById('scanSpeed').textContent = scanCount;
+                scanCount = 0;
+                lastScanTime = now;
+            }
+        }
+    }
+    
+    requestAnimationFrame(scanQRCode);
+}
+
+// 处理扫描到的QR码
+function processQRCode(data) {
+    try {
+        const parsed = JSON.parse(data);
+        
+        // 检查协议版本
+        if (parsed.v === 2) {
+            // 新协议，支持文件传输
+            handleV2Protocol(parsed);
+        } else if (parsed.i && parsed.t && parsed.d) {
+            // 旧协议，仅支持文本
+            handleV1Protocol(parsed);
+        } else {
+            console.error('未知的数据格式');
+        }
+    } catch (e) {
+        console.error('解析QR码数据失败:', e);
+    }
+}
+
+// 处理V2协议（支持文件）
+function handleV2Protocol(data) {
+    const chunkIndex = data.i;
+    const total = data.t;
+    
+    // 初始化总分片数
+    if (totalChunks === 0) {
+        totalChunks = total;
+        document.getElementById('totalChunks').textContent = total;
+    }
+    
+    // 检查是否已接收过此分片
+    if (chunks[chunkIndex]) {
+        return;
+    }
+    
+    // 存储分片
+    chunks[chunkIndex] = data.d;
+    
+    // 更新数据类型
+    if (data.type) {
+        dataType = data.type;
+        document.getElementById('dataType').textContent = dataType === 'file' ? '文件' : '文本';
+    }
+    
+    // 更新进度
+    const receivedCount = Object.keys(chunks).length;
+    updateProgress(receivedCount, totalChunks);
+    
+    // 检查是否接收完成
+    if (receivedCount === totalChunks) {
+        assembleData(data.type);
+    }
+}
+
+// 处理V1协议（仅文本）
+function handleV1Protocol(data) {
+    const chunkIndex = data.i;
+    const total = data.t;
+    const chunkData = data.e === 'b64' ? atob(data.d) : data.d;
+    
+    if (totalChunks === 0) {
+        totalChunks = total;
+        document.getElementById('totalChunks').textContent = total;
+    }
+    
+    if (chunks[chunkIndex]) {
+        return;
+    }
+    
+    chunks[chunkIndex] = chunkData;
+    
+    const receivedCount = Object.keys(chunks).length;
+    updateProgress(receivedCount, totalChunks);
+    
+    if (receivedCount === totalChunks) {
+        assembleTextData();
+    }
+}
+
+// 组装数据
+function assembleData(type) {
+    if (type === 'file') {
+        assembleFileData();
+    } else {
+        assembleTextData();
+    }
+}
+
+// 组装文本数据
+function assembleTextData() {
+    let result = '';
+    for (let i = 1; i <= totalChunks; i++) {
+        if (chunks[i]) {
+            result += chunks[i];
+        }
+    }
+    
+    // 尝试解析是否为文件数据
+    try {
+        const parsed = JSON.parse(result);
+        if (parsed.type === 'file' && parsed.metadata && parsed.data) {
+            // 这是文件数据
+            fileMetadata = parsed.metadata;
+            receivedData = parsed.data;
+            displayFile();
+            return;
+        }
+    } catch (e) {
+        // 不是JSON，作为普通文本处理
+    }
+    
+    // 显示文本结果
+    receivedData = result;
+    displayText(result);
+}
+
+// 组装文件数据
+function assembleFileData() {
+    let result = '';
+    for (let i = 1; i <= totalChunks; i++) {
+        if (chunks[i]) {
+            result += chunks[i];
+        }
+    }
+    
+    try {
+        const parsed = JSON.parse(result);
+        if (parsed.type === 'file' && parsed.metadata && parsed.data) {
+            fileMetadata = parsed.metadata;
+            receivedData = parsed.data;
+            displayFile();
+        }
+    } catch (e) {
+        console.error('解析文件数据失败:', e);
+        updateStatus('文件数据解析失败', 'error');
+    }
+}
+
+// 显示文本结果
+function displayText(text) {
+    stopScanning();
+    
+    document.getElementById('textSection').style.display = 'block';
+    document.getElementById('fileSection').style.display = 'none';
+    document.getElementById('result').textContent = text;
+    
+    updateStatus('文本接收完成！', 'success');
+    
+    // 计算文本大小
+    const size = new Blob([text]).size;
+    document.getElementById('totalSize').textContent = formatFileSize(size);
+}
+
+// 显示文件结果
+function displayFile() {
+    stopScanning();
+    
+    document.getElementById('textSection').style.display = 'none';
+    document.getElementById('fileSection').style.display = 'block';
+    
+    // 显示文件信息
+    const fileInfo = document.getElementById('fileInfo');
+    fileInfo.style.display = 'block';
+    document.getElementById('fileName').textContent = '文件名: ' + fileMetadata.name;
+    document.getElementById('fileSize').textContent = '大小: ' + formatFileSize(fileMetadata.size);
+    document.getElementById('fileType').textContent = '类型: ' + (fileMetadata.type || '未知');
+    document.getElementById('fileModified').textContent = '修改时间: ' + new Date(fileMetadata.lastModified).toLocaleString();
+    
+    // 创建下载链接
+    const base64Data = receivedData;
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: fileMetadata.type || 'application/octet-stream' });
+    
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.getElementById('downloadLink');
+    downloadLink.href = url;
+    downloadLink.download = fileMetadata.name;
+    
+    const downloadSection = document.getElementById('downloadSection');
+    downloadSection.style.display = 'block';
+    downloadSection.classList.add('ready');
+    
+    updateStatus('文件接收完成！', 'success');
+    document.getElementById('totalSize').textContent = formatFileSize(fileMetadata.size);
+}
+
+// 更新进度
+function updateProgress(received, total) {
+    const percent = Math.round((received / total) * 100);
+    
+    document.getElementById('receivedChunks').textContent = received;
+    document.getElementById('chunkCount').textContent = `${received}/${total}`;
+    document.getElementById('progress').textContent = `${percent}%`;
+    
+    const progressBar = document.getElementById('progressBar');
+    progressBar.style.width = `${percent}%`;
+    progressBar.textContent = `${percent}%`;
+}
+
+// 更新状态
+function updateStatus(message, type = '') {
+    const status = document.getElementById('status');
+    status.textContent = message;
+    status.className = 'status ' + type;
+}
+
+// 复制文本
+function copyText() {
+    const result = document.getElementById('result').textContent;
+    navigator.clipboard.writeText(result).then(() => {
+        updateStatus('文本已复制到剪贴板', 'success');
+    }).catch(err => {
+        console.error('复制失败:', err);
+        updateStatus('复制失败', 'error');
+    });
+}
+
+// 清空数据
+function clearData() {
+    chunks = {};
+    totalChunks = 0;
+    receivedData = null;
+    fileMetadata = null;
+    
+    document.getElementById('result').textContent = '';
+    document.getElementById('textSection').style.display = 'none';
+    document.getElementById('fileSection').style.display = 'none';
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('downloadSection').style.display = 'none';
+    document.getElementById('downloadSection').classList.remove('ready');
+    
+    document.getElementById('receivedChunks').textContent = '0';
+    document.getElementById('totalChunks').textContent = '0';
+    document.getElementById('chunkCount').textContent = '0/0';
+    document.getElementById('progress').textContent = '0%';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressBar').textContent = '0%';
+    document.getElementById('dataType').textContent = '-';
+    document.getElementById('totalSize').textContent = '-';
+    
+    updateStatus('数据已清空', 'success');
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 页面加载完成后初始化
+window.addEventListener('load', () => {
+    initCamera();
+});
+
+// 页面卸载时释放资源
+window.addEventListener('beforeunload', () => {
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+</body>
+</html>
