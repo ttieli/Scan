@@ -413,54 +413,63 @@ async function generateQR() {
         const correctLevel = correctLevelMap[errorLevel] || QRCode.CorrectLevel.L;
         
         // 根据数据长度显式选择QR码版本
-        // 使用更保守的阈值，确保有足够的容量
-        if (errorLevel === 'L') {
+        // 使用极度保守的阈值（预留100%余量）
+        // 特别处理第一片元数据
+        if (index === 0 && dataType === 'file') {
+            // 元数据片需要更高版本（最低V10）
+            if (qrDataLength < 30) typeNumber = 10;
+            else if (qrDataLength < 60) typeNumber = 15;
+            else if (qrDataLength < 100) typeNumber = 20;
+            else if (qrDataLength < 150) typeNumber = 25;
+            else if (qrDataLength < 200) typeNumber = 30;
+            else typeNumber = 35;
+        } else if (errorLevel === 'L') {
             maxLength = 2953; // Version 40, Level L
-            // 根据数据长度选择合适的版本（使用更保守的值）
-            if (qrDataLength < 40) typeNumber = 4;
-            else if (qrDataLength < 80) typeNumber = 7;
-            else if (qrDataLength < 150) typeNumber = 10;
-            else if (qrDataLength < 250) typeNumber = 15;
-            else if (qrDataLength < 400) typeNumber = 20;
-            else if (qrDataLength < 550) typeNumber = 25;
-            else if (qrDataLength < 750) typeNumber = 30;
-            else if (qrDataLength < 950) typeNumber = 35;
+            // 普通数据片：极度保守的阈值
+            if (qrDataLength < 20) typeNumber = 4;
+            else if (qrDataLength < 40) typeNumber = 7;
+            else if (qrDataLength < 75) typeNumber = 10;
+            else if (qrDataLength < 125) typeNumber = 15;
+            else if (qrDataLength < 200) typeNumber = 20;
+            else if (qrDataLength < 275) typeNumber = 25;
+            else if (qrDataLength < 375) typeNumber = 30;
+            else if (qrDataLength < 475) typeNumber = 35;
             else typeNumber = 40;
         } else if (errorLevel === 'M') {
             maxLength = 2331; // Version 40, Level M
-            // 使用更保守的值
-            if (qrDataLength < 35) typeNumber = 4;
-            else if (qrDataLength < 65) typeNumber = 7;
-            else if (qrDataLength < 120) typeNumber = 10;
-            else if (qrDataLength < 200) typeNumber = 15;
-            else if (qrDataLength < 320) typeNumber = 20;
-            else if (qrDataLength < 450) typeNumber = 25;
-            else if (qrDataLength < 600) typeNumber = 30;
-            else if (qrDataLength < 750) typeNumber = 35;
+            // 极度保守的阈值
+            if (qrDataLength < 18) typeNumber = 4;
+            else if (qrDataLength < 32) typeNumber = 7;
+            else if (qrDataLength < 60) typeNumber = 10;
+            else if (qrDataLength < 100) typeNumber = 15;
+            else if (qrDataLength < 160) typeNumber = 20;
+            else if (qrDataLength < 225) typeNumber = 25;
+            else if (qrDataLength < 300) typeNumber = 30;
+            else if (qrDataLength < 375) typeNumber = 35;
             else typeNumber = 40;
         } else if (errorLevel === 'Q') {
             maxLength = 1663; // Version 40, Level Q
-            // 使用更保守的值
-            if (qrDataLength < 25) typeNumber = 4;
-            else if (qrDataLength < 45) typeNumber = 7;
-            else if (qrDataLength < 85) typeNumber = 10;
-            else if (qrDataLength < 140) typeNumber = 15;
-            else if (qrDataLength < 230) typeNumber = 20;
-            else if (qrDataLength < 320) typeNumber = 25;
-            else if (qrDataLength < 420) typeNumber = 30;
-            else if (qrDataLength < 530) typeNumber = 35;
+            // 极度保守的阈值
+            if (qrDataLength < 13) typeNumber = 4;
+            else if (qrDataLength < 22) typeNumber = 7;
+            else if (qrDataLength < 42) typeNumber = 10;
+            else if (qrDataLength < 70) typeNumber = 15;
+            else if (qrDataLength < 115) typeNumber = 20;
+            else if (qrDataLength < 160) typeNumber = 25;
+            else if (qrDataLength < 210) typeNumber = 30;
+            else if (qrDataLength < 265) typeNumber = 35;
             else typeNumber = 40;
         } else {
             maxLength = 1273; // Version 40, Level H
-            // 使用更保守的值
-            if (qrDataLength < 20) typeNumber = 4;
-            else if (qrDataLength < 35) typeNumber = 7;
-            else if (qrDataLength < 65) typeNumber = 10;
-            else if (qrDataLength < 105) typeNumber = 15;
-            else if (qrDataLength < 175) typeNumber = 20;
-            else if (qrDataLength < 245) typeNumber = 25;
-            else if (qrDataLength < 325) typeNumber = 30;
-            else if (qrDataLength < 410) typeNumber = 35;
+            // 极度保守的阈值
+            if (qrDataLength < 10) typeNumber = 4;
+            else if (qrDataLength < 17) typeNumber = 7;
+            else if (qrDataLength < 32) typeNumber = 10;
+            else if (qrDataLength < 53) typeNumber = 15;
+            else if (qrDataLength < 87) typeNumber = 20;
+            else if (qrDataLength < 122) typeNumber = 25;
+            else if (qrDataLength < 162) typeNumber = 30;
+            else if (qrDataLength < 205) typeNumber = 35;
             else typeNumber = 40;
         }
         
