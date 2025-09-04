@@ -302,9 +302,10 @@ body {
         </div>
         
         <div class="video-controls">
-            <button onclick="toggleCamera()">切换摄像头</button>
+            <button onclick="toggleCamera()" id="cameraBtn">切换摄像头</button>
             <button onclick="toggleSize()">调整大小</button>
             <button onclick="toggleVideo()">隐藏/显示</button>
+            <button onclick="forceRearCamera()" style="background: #17a2b8;">强制后置</button>
         </div>
         
         <canvas id="canvas"></canvas>
@@ -397,16 +398,30 @@ let dataType = 'text';
 // 初始化摄像头
 async function initCamera() {
     try {
+        // 先请求基本权限，这样才能获取设备列表
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        
         // 获取所有摄像头
         const devices = await navigator.mediaDevices.enumerateDevices();
         cameras = devices.filter(device => device.kind === 'videoinput');
+        
+        console.log('找到摄像头:', cameras.length, cameras);
         
         if (cameras.length === 0) {
             throw new Error('没有找到摄像头');
         }
         
-        // 启动默认摄像头
-        await switchCamera(0);
+        // iOS设备优先使用后置摄像头
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS && cameras.length > 1) {
+            // 通常后置摄像头是第二个（index 1）
+            currentCameraIndex = 1;
+        } else {
+            currentCameraIndex = 0;
+        }
+        
+        // 启动选定的摄像头
+        await switchCamera(currentCameraIndex);
         
         updateStatus('摄像头已就绪', 'success');
     } catch (err) {
@@ -421,35 +436,147 @@ async function switchCamera(index) {
     
     currentCameraIndex = index % cameras.length;
     
-    const constraints = {
-        video: {
-            deviceId: { exact: cameras[currentCameraIndex].deviceId },
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-        }
-    };
+    // 先停止当前流
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    let constraints;
+    
+    if (isIOS) {
+        // iOS特殊处理
+        constraints = {
+            video: {
+                deviceId: cameras[currentCameraIndex].deviceId ? 
+                    { exact: cameras[currentCameraIndex].deviceId } : undefined,
+                facingMode: currentCameraIndex === 0 ? 'user' : 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+    } else {
+        // 其他设备
+        constraints = {
+            video: {
+                deviceId: { exact: cameras[currentCameraIndex].deviceId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+    }
     
     try {
+        console.log('切换到摄像头:', currentCameraIndex, constraints);
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         
         // 等待视频元数据加载
         await new Promise(resolve => {
-            video.onloadedmetadata = resolve;
+            video.onloadedmetadata = () => {
+                resolve();
+            };
         });
         
         // 设置canvas尺寸
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        
+        updateStatus(`摄像头 ${currentCameraIndex + 1}/${cameras.length} 已激活`, 'success');
     } catch (err) {
         console.error('切换摄像头失败:', err);
-        updateStatus('切换摄像头失败', 'error');
+        // 尝试使用基本配置
+        try {
+            const fallbackConstraints = {
+                video: {
+                    facingMode: currentCameraIndex === 0 ? 'user' : 'environment'
+                }
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            video.srcObject = stream;
+            
+            await new Promise(resolve => {
+                video.onloadedmetadata = resolve;
+            });
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            updateStatus(`摄像头已激活（降级模式）`, 'warning');
+        } catch (fallbackErr) {
+            console.error('降级切换也失败:', fallbackErr);
+            updateStatus('切换摄像头失败', 'error');
+        }
     }
 }
 
 // 切换摄像头按钮
 function toggleCamera() {
     switchCamera(currentCameraIndex + 1);
+}
+
+// 强制使用后置摄像头
+async function forceRearCamera() {
+    // 先停止当前流
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+    
+    try {
+        // 直接使用environment facingMode
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { exact: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        });
+        
+        video.srcObject = stream;
+        
+        await new Promise(resolve => {
+            video.onloadedmetadata = resolve;
+        });
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        updateStatus('后置摄像头已激活', 'success');
+        
+        // 更新摄像头索引
+        if (cameras.length > 1) {
+            currentCameraIndex = 1;
+        }
+    } catch (err) {
+        console.error('无法访问后置摄像头，尝试降级:', err);
+        
+        // 如果exact失败，尝试ideal
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            
+            video.srcObject = stream;
+            
+            await new Promise(resolve => {
+                video.onloadedmetadata = resolve;
+            });
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            updateStatus('摄像头已激活（可能是后置）', 'warning');
+        } catch (fallbackErr) {
+            console.error('无法切换到后置摄像头:', fallbackErr);
+            updateStatus('无法切换到后置摄像头', 'error');
+        }
+    }
 }
 
 // 切换视频大小
