@@ -172,6 +172,63 @@ body {
     color: #666;
 }
 
+.missing-chunks {
+    background: #fff3cd;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 12px;
+    color: #856404;
+    max-height: 100px;
+    overflow-y: auto;
+    display: none;
+}
+
+.missing-chunks.show {
+    display: block;
+}
+
+.chunk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
+    gap: 2px;
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.chunk-cell {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.chunk-cell.received {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.chunk-cell.missing {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.chunk-cell:hover {
+    transform: scale(1.1);
+    z-index: 10;
+}
+
 .file-info {
     background: #e7f5ff;
     padding: 15px;
@@ -370,6 +427,14 @@ body {
             <span>总分片: <strong id="totalChunks">0</strong></span>
             <span>扫描速度: <strong id="scanSpeed">0</strong> 片/秒</span>
         </div>
+        <div class="missing-chunks" id="missingChunks">
+            <strong>缺失分片:</strong>
+            <span id="missingList"></span>
+        </div>
+        <div style="margin: 10px 0;">
+            <button class="btn btn-secondary" onclick="toggleChunkGrid()" id="gridBtn">显示分片网格</button>
+        </div>
+        <div class="chunk-grid" id="chunkGrid" style="display: none;"></div>
     </div>
 </div>
 
@@ -853,6 +918,98 @@ function updateProgress(received, total) {
     const progressBar = document.getElementById('progressBar');
     progressBar.style.width = `${percent}%`;
     progressBar.textContent = `${percent}%`;
+    
+    // 更新缺失分片信息
+    updateMissingChunks(total);
+    
+    // 更新分片网格
+    updateChunkGrid(total);
+}
+
+// 更新缺失分片列表
+function updateMissingChunks(total) {
+    const missing = [];
+    for (let i = 1; i <= total; i++) {
+        if (!chunks[i]) {
+            missing.push(i);
+        }
+    }
+    
+    const missingDiv = document.getElementById('missingChunks');
+    const missingList = document.getElementById('missingList');
+    
+    if (missing.length > 0) {
+        missingDiv.classList.add('show');
+        
+        // 如果缺失太多，显示范围
+        if (missing.length > 20) {
+            const ranges = [];
+            let start = missing[0];
+            let end = missing[0];
+            
+            for (let i = 1; i < missing.length; i++) {
+                if (missing[i] === end + 1) {
+                    end = missing[i];
+                } else {
+                    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+                    start = end = missing[i];
+                }
+            }
+            ranges.push(start === end ? `${start}` : `${start}-${end}`);
+            
+            missingList.textContent = ranges.join(', ') + ` (共${missing.length}个)`;
+        } else {
+            missingList.textContent = missing.join(', ');
+        }
+    } else {
+        missingDiv.classList.remove('show');
+    }
+}
+
+// 更新分片网格
+function updateChunkGrid(total) {
+    const grid = document.getElementById('chunkGrid');
+    
+    // 如果网格还未初始化或总数变化，重新创建
+    if (grid.children.length !== total) {
+        grid.innerHTML = '';
+        for (let i = 1; i <= total; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'chunk-cell missing';
+            cell.textContent = i;
+            cell.title = `分片 #${i}`;
+            cell.id = `chunk-cell-${i}`;
+            grid.appendChild(cell);
+        }
+    }
+    
+    // 更新单元格状态
+    for (let i = 1; i <= total; i++) {
+        const cell = document.getElementById(`chunk-cell-${i}`);
+        if (cell) {
+            if (chunks[i]) {
+                cell.className = 'chunk-cell received';
+                cell.title = `分片 #${i} ✓`;
+            } else {
+                cell.className = 'chunk-cell missing';
+                cell.title = `分片 #${i} ✗`;
+            }
+        }
+    }
+}
+
+// 切换分片网格显示
+function toggleChunkGrid() {
+    const grid = document.getElementById('chunkGrid');
+    const btn = document.getElementById('gridBtn');
+    
+    if (grid.style.display === 'none') {
+        grid.style.display = 'grid';
+        btn.textContent = '隐藏分片网格';
+    } else {
+        grid.style.display = 'none';
+        btn.textContent = '显示分片网格';
+    }
 }
 
 // 更新状态
@@ -895,6 +1052,15 @@ function clearData() {
     document.getElementById('progressBar').textContent = '0%';
     document.getElementById('dataType').textContent = '-';
     document.getElementById('totalSize').textContent = '-';
+    
+    // 清空缺失分片信息
+    document.getElementById('missingChunks').classList.remove('show');
+    document.getElementById('missingList').textContent = '';
+    
+    // 清空分片网格
+    document.getElementById('chunkGrid').innerHTML = '';
+    document.getElementById('chunkGrid').style.display = 'none';
+    document.getElementById('gridBtn').textContent = '显示分片网格';
     
     updateStatus('数据已清空', 'success');
 }
