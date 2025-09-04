@@ -751,18 +751,24 @@ function handleV2Protocol(data) {
         return;
     }
     
-    // 存储分片
-    chunks[chunkIndex] = data.d;
+    // 如果是元数据片（文件的第一片）
+    if (data.meta && data.f === 1 && data.m) {
+        // 存储元数据
+        chunks[chunkIndex] = {
+            _isMeta: true,
+            f: data.f,
+            m: data.m
+        };
+        chunks.hasMetadata = true;
+    } else {
+        // 存储普通数据片
+        chunks[chunkIndex] = data.d;
+    }
     
     // 更新数据类型
     if (data.type) {
         dataType = data.type;
         document.getElementById('dataType').textContent = dataType === 'file' ? '文件' : '文本';
-    }
-    
-    // 如果是文件的第一片，记录元数据标记
-    if (data.meta) {
-        chunks.hasMetadata = true;
     }
     
     // 更新进度
@@ -847,19 +853,33 @@ function assembleFileData() {
         if (chunks[i]) {
             if (i === 1) {
                 // 第一片应该包含元数据
+                const firstChunk = chunks[i];
+                
+                // 检查是否是新格式的元数据
+                if (firstChunk._isMeta && firstChunk.f === 1 && firstChunk.m) {
+                    // 恢复完整的元数据格式
+                    metadata = {
+                        name: firstChunk.m.n,
+                        size: firstChunk.m.s,
+                        type: firstChunk.m.t.includes('/') ? firstChunk.m.t : `application/${firstChunk.m.t}`,
+                        lastModified: Date.now()  // 使用当前时间
+                    };
+                    continue;  // 跳过第一片，它只包含元数据
+                }
+                
+                // 尝试解析为JSON（兼容旧格式）
                 try {
-                    const firstChunk = JSON.parse(chunks[i]);
+                    const parsed = typeof firstChunk === 'string' ? JSON.parse(firstChunk) : firstChunk;
                     
-                    // 新的精简格式
-                    if (firstChunk.f === 1 && firstChunk.m) {
-                        // 恢复完整的元数据格式
+                    // 旧的精简格式
+                    if (parsed.f === 1 && parsed.m) {
                         metadata = {
-                            name: firstChunk.m.n,
-                            size: firstChunk.m.s,
-                            type: firstChunk.m.t.includes('/') ? firstChunk.m.t : `application/${firstChunk.m.t}`,
-                            lastModified: Date.now()  // 使用当前时间
+                            name: parsed.m.n,
+                            size: parsed.m.s,
+                            type: parsed.m.t.includes('/') ? parsed.m.t : `application/${parsed.m.t}`,
+                            lastModified: Date.now()
                         };
-                        continue;  // 跳过第一片，它只包含元数据
+                        continue;
                     }
                     
                     // 兼容之前的格式
