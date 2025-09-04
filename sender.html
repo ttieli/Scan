@@ -65,6 +65,9 @@ textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8p
             <div class="option-group">
                 <label>循环速度</label>
                 <select id="loopSpeed" onchange="updateLoopSpeed()">
+                    <option value="100">闪电 (0.1秒)</option>
+                    <option value="300">极快 (0.3秒)</option>
+                    <option value="500">很快 (0.5秒)</option>
                     <option value="1000">快速 (1秒)</option>
                     <option value="2000" selected>正常 (2秒)</option>
                     <option value="3000">慢速 (3秒)</option>
@@ -249,15 +252,15 @@ function chunkText(text, maxSize) {
     } else if (errorLevel === 'M') {
         effectiveSize = Math.floor(maxSize * 0.8);
     } else {
-        // L级纠错，可以使用更多数据
+        // L级纠错，使用更保守的缩减系数以确保兼容性
         if (maxSize <= 15) {
             effectiveSize = maxSize; // 小分片保持原样
         } else if (maxSize <= 30) {
-            effectiveSize = Math.floor(maxSize * 0.95); // 中分片减少5%
+            effectiveSize = Math.floor(maxSize * 0.85); // 中分片减少15%（原5%）
         } else if (maxSize <= 50) {
-            effectiveSize = Math.floor(maxSize * 0.9); // 大分片减少10%
+            effectiveSize = Math.floor(maxSize * 0.7); // 大分片减少30%（原10%）
         } else {
-            effectiveSize = Math.floor(maxSize * 0.85); // 超大分片减少15%以防QR溢出
+            effectiveSize = Math.floor(maxSize * 0.5); // 超大分片减少50%（原15%）确保中文兼容
         }
     }
     
