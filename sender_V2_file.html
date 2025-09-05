@@ -429,14 +429,14 @@ async function generateQR() {
                 maxLength = 1273; // Version 40, Level H
             }
             
-            // 设置typeNumber（使用更保守的阈值，117字节需要V20+）
-            if (qrDataLength < 20) typeNumber = 10;
-            else if (qrDataLength < 35) typeNumber = 15;
-            else if (qrDataLength < 55) typeNumber = 20;
-            else if (qrDataLength < 80) typeNumber = 25;
-            else if (qrDataLength < 110) typeNumber = 30;
-            else if (qrDataLength < 150) typeNumber = 35;
-            else typeNumber = 40;
+            // 设置typeNumber（极度保守，确保元数据不会溢出）
+            if (qrDataLength < 15) typeNumber = 10;
+            else if (qrDataLength < 25) typeNumber = 15;
+            else if (qrDataLength < 40) typeNumber = 20;
+            else if (qrDataLength < 55) typeNumber = 25;
+            else if (qrDataLength < 75) typeNumber = 30;
+            else if (qrDataLength < 100) typeNumber = 35;
+            else typeNumber = 40;  // 100字节以上都用最高版本
         } else if (errorLevel === 'L') {
             maxLength = 2953; // Version 40, Level L
             // 普通数据片：极度保守的阈值
