@@ -312,8 +312,18 @@ async function generateQR() {
         const dataChunks = createChunks(base64Data, chunkSize);
         
         // 创建精简的元数据（减少大小）
+        // 截断文件名到最多20字符（防止超长文件名导致QR码过大）
+        let shortName = fileMetadata.name;
+        if (shortName.length > 20) {
+            const ext = shortName.split('.').pop();
+            const nameWithoutExt = shortName.substring(0, shortName.lastIndexOf('.'));
+            // 保留前15字符 + ... + 扩展名
+            shortName = nameWithoutExt.substring(0, 15) + '...' + ext;
+            console.log(`文件名过长，已截断: "${fileMetadata.name}" → "${shortName}"`);
+        }
+
         const simplifiedMetadata = {
-            n: fileMetadata.name,  // name简化为n
+            n: shortName,  // name简化为n，且限制长度
             s: fileMetadata.size,  // size简化为s
             t: fileMetadata.type.split('/')[1] || 'bin'  // 只保留类型后缀
         };
@@ -390,10 +400,15 @@ async function generateQR() {
         
         // 调试：打印第一片的实际数据
         if (index === 0 && dataType === 'file') {
-            console.log('第一片chunk内容:', chunk);
-            console.log('第一片chunk长度:', chunk.length);
-            console.log('协议封装后:', qrData);
-            console.log('协议封装后长度:', qrData.length);
+            console.log('═══ 元数据QR码调试信息 ═══');
+            console.log('文件名:', chunk.m.n);
+            console.log('文件大小:', chunk.m.s, '字节');
+            console.log('总片数:', chunks.length, '片');
+            console.log('协议对象:', protocol);
+            console.log('JSON序列化后:', qrData);
+            console.log('JSON长度:', qrData.length, '字节');
+            console.log('选择的QR版本:', typeNumber);
+            console.log('════════════════════════════');
         }
         
         // 估算QR码容量和版本
@@ -416,8 +431,8 @@ async function generateQR() {
         // 使用极度保守的阈值（预留100%余量）
         // 特别处理第一片元数据
         if (index === 0 && dataType === 'file') {
-            // 元数据片需要更高版本（最低V10）
-            
+            // 元数据片需要更高版本（最低V15，因为可能包含大文件的总片数）
+
             // 根据纠错级别设置maxLength（修复元数据片maxLength为0的问题）
             if (errorLevel === 'L') {
                 maxLength = 2953; // Version 40, Level L
@@ -428,15 +443,15 @@ async function generateQR() {
             } else {
                 maxLength = 1273; // Version 40, Level H
             }
-            
-            // 设置typeNumber（极度保守，确保元数据不会溢出）
-            if (qrDataLength < 15) typeNumber = 10;
-            else if (qrDataLength < 25) typeNumber = 15;
-            else if (qrDataLength < 40) typeNumber = 20;
-            else if (qrDataLength < 55) typeNumber = 25;
-            else if (qrDataLength < 75) typeNumber = 30;
-            else if (qrDataLength < 100) typeNumber = 35;
-            else typeNumber = 40;  // 100字节以上都用最高版本
+
+            // 设置typeNumber（超保守策略，元数据起步版本更高）
+            // 因为元数据包含总片数，大文件会导致这个数字很大
+            if (qrDataLength < 30) typeNumber = 15;  // 起步V15而不是V10
+            else if (qrDataLength < 50) typeNumber = 20;
+            else if (qrDataLength < 70) typeNumber = 25;
+            else if (qrDataLength < 90) typeNumber = 30;
+            else if (qrDataLength < 120) typeNumber = 35;
+            else typeNumber = 40;  // 120字节以上都用最高版本
         } else if (errorLevel === 'L') {
             maxLength = 2953; // Version 40, Level L
             // 普通数据片：极度保守的阈值
